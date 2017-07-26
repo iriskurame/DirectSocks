@@ -19,6 +19,7 @@ public class Docker implements LifeCycle {
     private static Logger logger = LoggerFactory.getLogger(Docker.class);
 
     private LifeCycle.State state;
+
     private final ByteBufferCachePool byteBufferCachePool;
     private final int workerCount;
     private final Switcher[] switchers;
@@ -42,7 +43,7 @@ public class Docker implements LifeCycle {
         if (state != State.NEW) throw new CubeStateException();
         state = State.STARTING;
 
-        initDocker();
+        startDocker();
 
         state = State.RUNNING;
         logger.debug("Docker成功开启");
@@ -53,7 +54,7 @@ public class Docker implements LifeCycle {
         if (state != State.RUNNING) throw new CubeStateException();
         state = State.STOPING;
 
-        destroyDocker();
+        shutdownDocker();
 
         state = State.STOPED;
         logger.debug("Docker成功关闭");
@@ -68,7 +69,9 @@ public class Docker implements LifeCycle {
         if (workerCount < 1 || workerCount > 16) throw new DokerInitException("worker数量必须在[1, 16]之间取值");
     }
 
-    private void initDocker() {
+    private void startDocker() {
+        byteBufferCachePool.start();
+
         for (Switcher switcher : switchers) {
             try {
                 switcher.start();
@@ -78,7 +81,7 @@ public class Docker implements LifeCycle {
         }
     }
 
-    private void destroyDocker() {
+    private void shutdownDocker() {
         for (Switcher switcher : switchers) {
             try {
                 switcher.shutdown();
@@ -86,6 +89,9 @@ public class Docker implements LifeCycle {
                 logger.error("Switcher启动失败");
             }
         }
+
+        byteBufferCachePool.shutdown();
+
     }
 
     private Switcher select(final SocketChannel socketChannel) {

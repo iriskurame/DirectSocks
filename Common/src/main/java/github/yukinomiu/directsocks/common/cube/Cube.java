@@ -15,6 +15,7 @@ public class Cube implements LifeCycle {
     private static Logger logger = LoggerFactory.getLogger(Cube.class);
 
     private LifeCycle.State state;
+
     private final Dispatcher dispatcher;
     private final Docker docker;
 

@@ -22,8 +22,8 @@ public class SimpleByteBufferCachePool implements ByteBufferCachePool {
     private final int maxIndex;
     private int top;
 
-    private long getCount; // TODO delete
-    private long returnCount; // TODO delete
+    private long getCount;
+    private long returnCount;
 
     public SimpleByteBufferCachePool(final CubeConfig cubeConfig) throws ByteBufferCachePoolInitException {
         checkConfig(cubeConfig);
@@ -106,14 +106,7 @@ public class SimpleByteBufferCachePool implements ByteBufferCachePool {
     @Override
     public void shutdown() {
         factory.shutdown();
-    }
-
-    @Override // TODO delete
-    public String toString() {
-        return "SimpleByteBufferCachePool{" +
-                "getCount=" + getCount +
-                ", returnCount=" + returnCount +
-                '}';
+        logger.debug("getCount={}, returnCount={}", getCount, returnCount);
     }
 
     private void checkConfig(final CubeConfig cubeConfig) throws ByteBufferCachePoolInitException {

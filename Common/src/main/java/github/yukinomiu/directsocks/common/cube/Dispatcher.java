@@ -80,7 +80,7 @@ public class Dispatcher implements LifeCycle {
         if (state != State.NEW) throw new CubeStateException();
         state = State.STARTING;
 
-        initDispatcher();
+        startDispatcher();
 
         state = State.RUNNING;
         logger.debug("Dispatcher成功开启");
@@ -91,7 +91,7 @@ public class Dispatcher implements LifeCycle {
         if (state != State.RUNNING) throw new CubeStateException();
         state = State.STOPING;
 
-        destroyDispatcher();
+        shutdownDispatcher();
 
         state = State.STOPED;
         logger.debug("Dispatcher成功关闭");
@@ -113,7 +113,7 @@ public class Dispatcher implements LifeCycle {
         if (backlog == null) throw new DispatcherInitException("Backlog不能为空");
     }
 
-    private void initDispatcher() {
+    private void startDispatcher() {
         dispatchThread = new Thread(() -> {
             logger.debug("开始监听本地连接, 监听地址 {}:{}", serverSocket.getInetAddress().getHostAddress(), serverSocket.getLocalPort());
 
@@ -146,14 +146,11 @@ public class Dispatcher implements LifeCycle {
                     }
 
                 } catch (CancelledKeyException e) {
-                    logger.warn("连接断开");
+                    logger.warn("连接已断开");
                 } catch (IOException e) {
-                    logger.error("DispatcherSelector IO异常", e);
-                } catch (ClosedSelectorException e) {
-                    logger.debug("DispatcherSelector已经关闭");
-                    break;
+                    logger.error("Dispatcher IO异常", e);
                 } catch (Exception e) {
-                    logger.debug("DispatcherSelector异常", e);
+                    logger.debug("Dispatcher异常", e);
                     break;
                 }
             }
@@ -165,16 +162,10 @@ public class Dispatcher implements LifeCycle {
         dispatchThread.start();
     }
 
-    private void destroyDispatcher() {
+    private void shutdownDispatcher() {
         if (dispatchThread != null) {
             dispatchThread.interrupt();
             dispatcherSelector.wakeup();
-        }
-
-        try {
-            dispatcherSelector.close();
-        } catch (IOException e) {
-            logger.error("关闭DispatcherSelector异常", e);
         }
 
         try {

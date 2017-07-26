@@ -3,6 +3,7 @@ package github.yukinomiu.directsocks.client.server;
 import github.yukinomiu.directsocks.client.exception.ClientRuntimeException;
 import github.yukinomiu.directsocks.common.cube.CubeContext;
 import github.yukinomiu.directsocks.common.cube.api.NioHandle;
+import github.yukinomiu.directsocks.common.cube.exception.NotYetWriteException;
 import github.yukinomiu.directsocks.common.rfc.SocksAuthMethod;
 import github.yukinomiu.directsocks.common.rfc.SocksRequest;
 import github.yukinomiu.directsocks.common.rfc.SocksResponse;
@@ -30,30 +31,43 @@ public class ClientNioHandle implements NioHandle {
     }
 
     @Override
-    public void handleRead(CubeContext cubeContext) {
+    public void handleRead(final CubeContext cubeContext) {
         ClientContext clientContext = (ClientContext) cubeContext.attachment();
         if (clientContext == null) {
-            clientContext = new ClientContext();
+            clientContext = new ClientContext(ClientChannelRole.CLIENT_ROLE);
             clientContext.setClientProxyState(ClientProxyState.SOCKS_AUTH);
 
             cubeContext.attach(clientContext);
         }
 
-        final ByteBuffer readBuffer = cubeContext.getReadBuffer();
-        final ByteBuffer writeBuffer = cubeContext.getWriteBuffer();
+        final ClientChannelRole currentRole = clientContext.getClientChannelRole();
+        switch (currentRole) {
+            case CLIENT_ROLE:
+                handleClientRead(cubeContext, clientContext);
+                break;
 
+            case SERVER_ROLE:
+                handleServerRead(cubeContext, clientContext);
+                break;
+
+            default:
+                throw new ClientRuntimeException(currentRole.name() + " 角色不支持");
+        }
+    }
+
+    private void handleClientRead(final CubeContext cubeContext, final ClientContext clientContext) {
         ClientProxyState currentState = clientContext.getClientProxyState();
         switch (currentState) {
             case SOCKS_AUTH:
-                handleSocksAuth(cubeContext, clientContext, readBuffer, writeBuffer);
+                handleSocksAuth(cubeContext, clientContext);
                 break;
 
             case SOCKS_PROXY:
-                handleSocksProxy(cubeContext, clientContext, readBuffer, writeBuffer);
+                handleSocksProxy(cubeContext, clientContext);
                 break;
 
             case DIRECT_SOCKS:
-                handleDirectSocks(cubeContext, clientContext, readBuffer, writeBuffer);
+                handleDirectSocks(cubeContext, clientContext);
                 break;
 
             default:
@@ -61,10 +75,15 @@ public class ClientNioHandle implements NioHandle {
         }
     }
 
+    private void handleServerRead(final CubeContext cubeContext, final ClientContext clientContext) {
+        // TODO
+    }
+
     private void handleSocksAuth(final CubeContext cubeContext,
-                                 final ClientContext clientContext,
-                                 final ByteBuffer readBuffer,
-                                 final ByteBuffer writeBuffer) {
+                                 final ClientContext clientContext) {
+
+        // read
+        final ByteBuffer readBuffer = cubeContext.getReadBuffer();
 
         if (readBuffer.remaining() < 3) {
             logger.warn("协议错误");
@@ -92,25 +111,39 @@ public class ClientNioHandle implements NioHandle {
             }
         }
 
-        clientContext.setClientProxyState(ClientProxyState.SOCKS_PROXY);
+        // write
+        final ByteBuffer writeBuffer;
+        try {
+            writeBuffer = cubeContext.readyWrite();
+        } catch (NotYetWriteException e) {
+            logger.error("处理SOCKS_AUTH未知异常, 断开连接", e);
+            cubeContext.cancel();
+            return;
+        }
 
         writeBuffer.put(SocksVersion.VERSION_5);
         if (!authSupport) {
             logger.warn("SOCKS验证协议不支持");
+
             writeBuffer.put(SocksAuthMethod.NO_ACCEPTABLE_METHODS);
             clientContext.setSocksAuthMethod(SocksAuthMethod.NO_ACCEPTABLE_METHODS);
 
             cubeContext.cancelAfterWrite();
+            return;
         } else {
             writeBuffer.put(SocksAuthMethod.NO_AUTH);
             clientContext.setSocksAuthMethod(SocksAuthMethod.NO_AUTH);
         }
+
+        // change state
+        clientContext.setClientProxyState(ClientProxyState.SOCKS_PROXY);
     }
 
     private void handleSocksProxy(final CubeContext cubeContext,
-                                  final ClientContext clientContext,
-                                  final ByteBuffer readBuffer,
-                                  final ByteBuffer writeBuffer) {
+                                  final ClientContext clientContext) {
+
+        // read
+        final ByteBuffer readBuffer = cubeContext.getReadBuffer();
 
         if (readBuffer.remaining() < 4) {
             logger.warn("协议错误");
@@ -195,7 +228,6 @@ public class ClientNioHandle implements NioHandle {
             return;
         }
 
-        clientContext.setClientProxyState(ClientProxyState.DIRECT_SOCKS);
         clientContext.setCommand(command);
         clientContext.setAddressType(addressType);
         clientContext.setAddress(address);
@@ -217,11 +249,22 @@ public class ClientNioHandle implements NioHandle {
             throw new ClientRuntimeException("本地监听地址类型不支持");
         }
 
+        // write
+        final ByteBuffer writeBuffer;
+        try {
+            writeBuffer = cubeContext.readyWrite();
+        } catch (NotYetWriteException e) {
+            logger.error("处理SOCKS_PROXY未知异常, 断开连接", e);
+            cubeContext.cancel();
+            return;
+        }
+
         writeBuffer.put(SocksVersion.VERSION_5);
 
         if (command != SocksRequest.COMMAND_CONNECT) {
             writeBuffer.put(SocksResponse.REP_COMMAND_NOT_SUPPORTED);
-            cubeContext.cancel();
+            cubeContext.cancelAfterWrite();
+            return;
         } else {
             writeBuffer.put(SocksResponse.REP_SUCCEEDED);
         }
@@ -230,12 +273,15 @@ public class ClientNioHandle implements NioHandle {
         writeBuffer.put(boundAddressType);
         writeBuffer.put(boundAddress);
         writeBuffer.putShort(portShort);
+
+        // change state
+        clientContext.setClientProxyState(ClientProxyState.DIRECT_SOCKS);
     }
 
     private void handleDirectSocks(final CubeContext cubeContext,
-                                   final ClientContext clientContext,
-                                   final ByteBuffer readBuffer,
-                                   final ByteBuffer writeBuffer) {
+                                   final ClientContext clientContext) {
+
+        final ByteBuffer readBuffer = cubeContext.getReadBuffer();
 
         byte[] b = new byte[readBuffer.remaining()];
         readBuffer.get(b, 0, b.length);

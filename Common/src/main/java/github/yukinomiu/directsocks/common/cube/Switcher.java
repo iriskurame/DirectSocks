@@ -13,6 +13,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -25,7 +26,7 @@ public class Switcher implements LifeCycle {
     private LifeCycle.State state;
     private final ByteBufferCachePool byteBufferCachePool;
     private final NioHandle nioHandle;
-    private final ReentrantLock lock;
+    private final Lock lock;
     private final Selector switchSelector;
 
     private Thread switchThread;
@@ -51,7 +52,7 @@ public class Switcher implements LifeCycle {
         if (state != State.NEW) throw new CubeStateException();
         state = State.STARTING;
 
-        initSwitcher();
+        startSwitcher();
 
         state = State.RUNNING;
         logger.debug("Switcher成功启动");
@@ -62,21 +63,30 @@ public class Switcher implements LifeCycle {
         if (state != State.RUNNING) throw new CubeStateException();
         state = State.STOPING;
 
-        destroySwitcher();
+        shutdownSwitcher();
 
         state = State.STOPED;
         logger.debug("Switcher成功关闭");
     }
 
-    private void initSwitcher() {
+    private void startSwitcher() {
         switchThread = new Thread(() -> {
-            logger.debug("开始等待IO事件");
+            logger.debug("开始等待Switcher IO事件");
 
             while (true) {
                 try {
                     int selectCount = switchSelector.select();
 
                     if (Thread.currentThread().isInterrupted()) {
+                        // close this switcher
+                        Set<SelectionKey> selectionKeys = switchSelector.keys();
+                        for (SelectionKey selectionKey : selectionKeys) {
+                            CubeContext cubeContext = (CubeContext) selectionKey.attachment();
+                            if (cubeContext != null) {
+                                cubeContext.cancel();
+                            }
+                        }
+
                         switchSelector.close();
                         break;
                     }
@@ -108,91 +118,60 @@ public class Switcher implements LifeCycle {
                     }
 
                 } catch (CancelledKeyException e) {
-                    logger.warn("连接断开");
+                    logger.warn("连接已断开");
                 } catch (IOException e) {
-                    logger.error("SwitchSelector IO异常", e);
-                } catch (ClosedSelectorException e) {
-                    logger.debug("SwitchSelector已经关闭");
-                    break;
+                    logger.error("Switcher IO异常", e);
                 } catch (Exception e) {
-                    logger.debug("SwitchSelector异常");
+                    logger.debug("Switcher异常", e);
                     break;
                 }
             }
 
-            logger.debug("结束等待IO事件");
+            logger.debug("结束等待Switcher IO事件");
         });
 
         switchThread.setName("switch thread");
         switchThread.start();
     }
 
-    private void destroySwitcher() {
+    private void shutdownSwitcher() {
         if (switchThread != null) {
             switchThread.interrupt();
             switchSelector.wakeup();
         }
-
-        try {
-            switchSelector.close();
-        } catch (IOException e) {
-            logger.error("关闭SwitchSelector异常", e);
-        }
     }
 
     private void handleRead(final SelectionKey selectionKey) {
-        ByteBuffer readBuffer = byteBufferCachePool.get();
-        ByteBuffer writeBuffer = byteBufferCachePool.get();
-
         SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
         CubeContext cubeContext = (CubeContext) selectionKey.attachment();
 
+        ByteBuffer readBuffer = cubeContext.readyRead();
+
+        int n;
         try {
-            int n;
-            try {
-                n = socketChannel.read(readBuffer);
-            } catch (IOException e) {
-                cancelAndCloseSelectionKey(selectionKey);
-                logger.warn("读取数据IO异常, 关闭连接", e);
-                return;
-            }
+            n = socketChannel.read(readBuffer);
+        } catch (IOException e) {
+            cubeContext.cancel();
+            logger.warn("读取数据IO异常, 关闭连接", e);
+            return;
+        }
 
-            if (n == -1) {
-                cancelAndCloseSelectionKey(selectionKey);
-                logger.debug("已到达流末尾, 关闭连接");
-                return;
-            }
+        if (n == -1) {
+            cubeContext.cancel();
+            logger.debug("已到达流末尾, 关闭连接");
+            return;
+        }
 
-            if (n == 0) {
-                return;
-            }
+        if (n == 0) {
+            return;
+        }
 
-            readBuffer.flip();
-            cubeContext.setReadBuffer(readBuffer);
-            cubeContext.setWriteBuffer(writeBuffer);
-
-            try {
-                nioHandle.handleRead(cubeContext);
-            } catch (Exception e) {
-                cancelAndCloseSelectionKey(selectionKey);
-                logger.error("NioHandle处理异常, 关闭连接", e);
-                return;
-            }
-
-            if (cubeContext.isCancelFlag()) {
-                cancelAndCloseSelectionKey(selectionKey);
-            }
-        } finally {
-            cubeContext.setReadBuffer(null);
-            byteBufferCachePool.returnBack(readBuffer);
-
-            writeBuffer.flip();
-            if (writeBuffer.remaining() == 0 || cubeContext.isCancelFlag()) { // no data to write
-                cubeContext.setWriteBuffer(null);
-                byteBufferCachePool.returnBack(writeBuffer);
-            } else {
-                selectionKey.interestOps(selectionKey.interestOps() | SelectionKey.OP_WRITE);
-            }
+        readBuffer.flip();
+        try {
+            nioHandle.handleRead(cubeContext);
+        } catch (Exception e) {
+            cubeContext.cancel();
+            logger.error("NioHandle处理异常, 关闭连接", e);
         }
     }
 
@@ -201,37 +180,21 @@ public class Switcher implements LifeCycle {
         CubeContext cubeContext = (CubeContext) selectionKey.attachment();
 
         ByteBuffer writeBuffer = cubeContext.getWriteBuffer();
+        writeBuffer.flip();
         try {
-            try {
-                socketChannel.write(writeBuffer);
-            } catch (IOException e) {
-                cancelAndCloseSelectionKey(selectionKey);
-                logger.warn("写入数据IO异常, 关闭连接", e);
-                return;
-            }
-
-            if (cubeContext.isCancelAfterWriteFlag()) {
-                cancelAndCloseSelectionKey(selectionKey);
-                return;
-            }
-
-            selectionKey.interestOps(selectionKey.interestOps() & (~SelectionKey.OP_WRITE));
-        } finally {
-            cubeContext.setWriteBuffer(null);
-            byteBufferCachePool.returnBack(writeBuffer);
-        }
-    }
-
-    private void cancelAndCloseSelectionKey(final SelectionKey selectionKey) {
-        SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
-
-        selectionKey.attach(null); // help GC
-        selectionKey.cancel();
-        try {
-            socketChannel.close();
+            socketChannel.write(writeBuffer);
         } catch (IOException e) {
-            logger.error("关闭SocketChannel IO异常", e);
+            cubeContext.cancel();
+            logger.warn("写入数据IO异常, 关闭连接", e);
+            return;
         }
+
+        if (cubeContext.isCancelAfterWriteFlag()) {
+            cubeContext.cancel();
+            return;
+        }
+
+        cubeContext.finishWrite();
     }
 
     void accept(final SocketChannel socketChannel) {
@@ -248,12 +211,13 @@ public class Switcher implements LifeCycle {
             return;
         }
 
-        CubeContext cubeContext = new CubeContext(switchSelector, lock);
-
         lock.lock();
         switchSelector.wakeup();
         try {
-            socketChannel.register(switchSelector, SelectionKey.OP_READ, cubeContext);
+            SelectionKey selectionKey = socketChannel.register(switchSelector, SelectionKey.OP_READ);
+
+            CubeContext cubeContext = new CubeContext(selectionKey, switchSelector, lock, byteBufferCachePool);
+            selectionKey.attach(cubeContext);
         } catch (ClosedChannelException e) {
             logger.warn("连接意外关闭", e);
         } finally {

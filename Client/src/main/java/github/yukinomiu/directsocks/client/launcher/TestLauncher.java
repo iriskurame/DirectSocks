@@ -25,7 +25,7 @@ public class TestLauncher {
         final int backlog = 1000;
         final int workerCount = 3;
         final int bufferSize = 1024;
-        final int poolSize = 16;
+        final int poolSize = 64;
 
         // config
         ClientConfig config = new ClientConfig();

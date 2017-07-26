@@ -1,9 +1,11 @@
 package github.yukinomiu.directsocks.client.server;
 
+import github.yukinomiu.directsocks.common.cube.api.CloseableAttachment;
 import github.yukinomiu.directsocks.common.rfc.SocksAuthMethod;
 import github.yukinomiu.directsocks.common.rfc.SocksRequest;
 import github.yukinomiu.directsocks.common.util.ByteUtil;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
@@ -12,7 +14,8 @@ import java.nio.charset.StandardCharsets;
  * Yukinomiu
  * 2017/7/24
  */
-public class ClientContext {
+public class ClientContext implements CloseableAttachment {
+    private final ClientChannelRole clientChannelRole;
     private ClientProxyState clientProxyState;
 
     private Byte socksAuthMethod;
@@ -20,6 +23,15 @@ public class ClientContext {
     private Byte addressType;
     private byte[] address;
     private byte[] port;
+
+    public ClientContext(final ClientChannelRole clientChannelRole) {
+        this.clientChannelRole = clientChannelRole;
+    }
+
+    @Override
+    public void close() throws IOException {
+
+    }
 
     @Override
     public String toString() {
@@ -103,12 +115,18 @@ public class ClientContext {
         }
 
         return "ClientContext{" +
-                "socksAuthMethod=" + socksAuthMethodStr +
+                "clientChannelRole=" + clientChannelRole +
+                ", clientProxyState=" + clientProxyState +
+                ", socksAuthMethod=" + socksAuthMethodStr +
                 ", command=" + commandStr +
                 ", addressType=" + addressTypeStr +
                 ", address=" + addressStr +
                 ", port=" + portStr +
                 '}';
+    }
+
+    public ClientChannelRole getClientChannelRole() {
+        return clientChannelRole;
     }
 
     public ClientProxyState getClientProxyState() {
