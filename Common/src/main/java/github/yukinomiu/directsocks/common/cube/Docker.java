@@ -94,7 +94,7 @@ public class Docker implements LifeCycle {
 
     }
 
-    private Switcher select(final SocketChannel socketChannel) {
+    private Switcher select() {
         if (next == workerCount) {
             next = 0;
         }
@@ -102,7 +102,7 @@ public class Docker implements LifeCycle {
     }
 
     void accept(final SocketChannel socketChannel) {
-        Switcher targetSwitcher = select(socketChannel);
+        Switcher targetSwitcher = select();
         targetSwitcher.accept(socketChannel);
     }
 }

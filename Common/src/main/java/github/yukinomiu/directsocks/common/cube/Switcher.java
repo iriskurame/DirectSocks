@@ -31,6 +31,8 @@ public class Switcher implements LifeCycle {
 
     private Thread switchThread;
 
+    private long acceptCount;
+
     Switcher(final ByteBufferCachePool byteBufferCachePool, final NioHandle nioHandle) throws SwitcherInitException {
         state = LifeCycle.State.NEW;
 
@@ -64,6 +66,7 @@ public class Switcher implements LifeCycle {
         state = State.STOPING;
 
         shutdownSwitcher();
+        logger.debug("acceptCount={}", acceptCount);
 
         state = State.STOPED;
         logger.debug("Switcher成功关闭");
@@ -198,6 +201,8 @@ public class Switcher implements LifeCycle {
     }
 
     void accept(final SocketChannel socketChannel) {
+        acceptCount++;
+
         try {
             socketChannel.configureBlocking(false);
         } catch (IOException e) {
