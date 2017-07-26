@@ -22,6 +22,7 @@ public class Client implements LifeCycle {
 
     public Client(final ClientConfig clientConfig) throws ClientInitException {
         state = LifeCycle.State.NEW;
+        checkConfig(clientConfig);
 
         clientNioHandle = new ClientNioHandle(clientConfig);
         try {
@@ -52,5 +53,9 @@ public class Client implements LifeCycle {
 
         state = State.STOPED;
         logger.debug("Client成功关闭");
+    }
+
+    private void checkConfig(final ClientConfig clientConfig) throws ClientInitException {
+        if (clientConfig == null) throw new ClientInitException("配置为空");
     }
 }

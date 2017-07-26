@@ -1,5 +1,6 @@
 package github.yukinomiu.directsocks.client.server;
 
+import github.yukinomiu.directsocks.client.exception.ClientInitException;
 import github.yukinomiu.directsocks.client.exception.ClientRuntimeException;
 import github.yukinomiu.directsocks.common.cube.CubeContext;
 import github.yukinomiu.directsocks.common.cube.api.NioHandle;
@@ -14,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
@@ -26,7 +28,8 @@ public class ClientNioHandle implements NioHandle {
 
     private final ClientConfig clientConfig;
 
-    public ClientNioHandle(final ClientConfig clientConfig) {
+    public ClientNioHandle(final ClientConfig clientConfig) throws ClientInitException {
+        checkConfig(clientConfig);
         this.clientConfig = clientConfig;
     }
 
@@ -229,8 +232,33 @@ public class ClientNioHandle implements NioHandle {
         }
 
         clientContext.setCommand(command);
-        clientContext.setAddressType(addressType);
-        clientContext.setAddress(address);
+
+        if (clientConfig.getLocalDnsResolve() && addressType == SocksRequest.ATYP_DOMAIN_NAME) {
+            String host = new String(address, StandardCharsets.US_ASCII);
+            try {
+                InetAddress targetAddress = InetAddress.getByName(host);
+
+                if (targetAddress instanceof Inet4Address) {
+                    clientContext.setAddressType(SocksRequest.ATYP_IPV4);
+                    clientContext.setAddress(targetAddress.getAddress());
+
+                } else if (targetAddress instanceof Inet6Address) {
+                    clientContext.setAddressType(SocksRequest.ATYP_IPV6);
+                    clientContext.setAddress(targetAddress.getAddress());
+
+                } else {
+                    throw new ClientRuntimeException("本地解析地址类型不支持");
+                }
+            } catch (UnknownHostException e) {
+                clientContext.setAddressType(addressType);
+                clientContext.setAddress(address);
+                logger.warn("域名 '{}' 本地解析失败", host);
+            }
+        } else {
+            clientContext.setAddressType(addressType);
+            clientContext.setAddress(address);
+        }
+
         clientContext.setPort(port);
 
         InetAddress localBindAddress = clientConfig.getBindAddress();
@@ -287,5 +315,12 @@ public class ClientNioHandle implements NioHandle {
         readBuffer.get(b, 0, b.length);
         logger.info(">>> data: {}", new String(b, StandardCharsets.US_ASCII));
         logger.info(">>> context: {}", clientContext.toString());
+    }
+
+    private void checkConfig(final ClientConfig clientConfig) throws ClientInitException {
+        if (clientConfig == null) throw new ClientInitException("配置不能为空");
+
+        Boolean localDnsResolve = clientConfig.getLocalDnsResolve();
+        if (localDnsResolve == null) throw new ClientInitException("DNS本地解析配置不能为空");
     }
 }

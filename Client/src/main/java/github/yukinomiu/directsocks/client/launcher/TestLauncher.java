@@ -26,6 +26,7 @@ public class TestLauncher {
         final int workerCount = 3;
         final int bufferSize = 1024;
         final int poolSize = 64;
+        final boolean localDnsResolve = true;
 
         // config
         ClientConfig config = new ClientConfig();
@@ -42,6 +43,7 @@ public class TestLauncher {
         config.setWorkerCount(workerCount);
         config.setBufferSize(bufferSize);
         config.setPoolSize(poolSize);
+        config.setLocalDnsResolve(localDnsResolve);
 
         // start client
         Client client;
