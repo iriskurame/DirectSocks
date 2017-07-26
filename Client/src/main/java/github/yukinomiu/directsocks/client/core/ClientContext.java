@@ -1,4 +1,4 @@
-package github.yukinomiu.directsocks.client.server;
+package github.yukinomiu.directsocks.client.core;
 
 import github.yukinomiu.directsocks.common.cube.api.CloseableAttachment;
 import github.yukinomiu.directsocks.common.rfc.SocksAuthMethod;

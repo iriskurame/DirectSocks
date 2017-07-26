@@ -1,9 +1,10 @@
-package github.yukinomiu.directsocks.client.server;
+package github.yukinomiu.directsocks.client.core;
 
 import github.yukinomiu.directsocks.client.exception.ClientInitException;
 import github.yukinomiu.directsocks.client.exception.ClientStateException;
 import github.yukinomiu.directsocks.common.cube.Cube;
 import github.yukinomiu.directsocks.common.cube.api.LifeCycle;
+import github.yukinomiu.directsocks.common.cube.api.NioHandle;
 import github.yukinomiu.directsocks.common.cube.exception.CubeInitException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +18,7 @@ public class Client implements LifeCycle {
 
     private LifeCycle.State state;
 
-    private final ClientNioHandle clientNioHandle;
+    private final NioHandle clientNioHandle;
     private final Cube cube;
 
     public Client(final ClientConfig clientConfig) throws ClientInitException {

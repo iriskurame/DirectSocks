@@ -1,4 +1,4 @@
-package github.yukinomiu.directsocks.client.server;
+package github.yukinomiu.directsocks.client.core;
 
 /**
  * Yukinomiu

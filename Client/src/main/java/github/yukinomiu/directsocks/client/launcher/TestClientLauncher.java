@@ -1,8 +1,8 @@
 package github.yukinomiu.directsocks.client.launcher;
 
+import github.yukinomiu.directsocks.client.core.Client;
+import github.yukinomiu.directsocks.client.core.ClientConfig;
 import github.yukinomiu.directsocks.client.exception.ClientInitException;
-import github.yukinomiu.directsocks.client.server.Client;
-import github.yukinomiu.directsocks.client.server.ClientConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,8 +16,8 @@ import java.net.UnknownHostException;
  * Yukinomiu
  * 2017/7/13
  */
-public class TestLauncher {
-    private static final Logger logger = LoggerFactory.getLogger(TestLauncher.class);
+public class TestClientLauncher {
+    private static final Logger logger = LoggerFactory.getLogger(TestClientLauncher.class);
 
     public static void main(String[] args) {
         final String localAddressName = "localhost";
@@ -64,13 +64,12 @@ public class TestLauncher {
                     break;
                 }
 
-                logger.info("unknown command '{}'", line);
+                logger.info("unknown client command '{}'", line);
             }
 
             client.shutdown();
         } catch (IOException e) {
             logger.error("IO异常", e);
         }
-
     }
 }

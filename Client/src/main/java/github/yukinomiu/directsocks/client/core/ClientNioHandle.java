@@ -1,4 +1,4 @@
-package github.yukinomiu.directsocks.client.server;
+package github.yukinomiu.directsocks.client.core;
 
 import github.yukinomiu.directsocks.client.exception.ClientInitException;
 import github.yukinomiu.directsocks.client.exception.ClientRuntimeException;
@@ -37,7 +37,7 @@ public class ClientNioHandle implements NioHandle {
     public void handleRead(final CubeContext cubeContext) {
         ClientContext clientContext = (ClientContext) cubeContext.attachment();
         if (clientContext == null) {
-            clientContext = new ClientContext(ClientChannelRole.CLIENT_ROLE);
+            clientContext = new ClientContext(ClientChannelRole.LOCAL_ROLE);
             clientContext.setClientProxyState(ClientProxyState.SOCKS_AUTH);
 
             cubeContext.attach(clientContext);
@@ -45,8 +45,8 @@ public class ClientNioHandle implements NioHandle {
 
         final ClientChannelRole currentRole = clientContext.getClientChannelRole();
         switch (currentRole) {
-            case CLIENT_ROLE:
-                handleClientRead(cubeContext, clientContext);
+            case LOCAL_ROLE:
+                handleLocalRead(cubeContext, clientContext);
                 break;
 
             case SERVER_ROLE:
@@ -58,7 +58,7 @@ public class ClientNioHandle implements NioHandle {
         }
     }
 
-    private void handleClientRead(final CubeContext cubeContext, final ClientContext clientContext) {
+    private void handleLocalRead(final CubeContext cubeContext, final ClientContext clientContext) {
         ClientProxyState currentState = clientContext.getClientProxyState();
         switch (currentState) {
             case SOCKS_AUTH:
@@ -114,6 +114,13 @@ public class ClientNioHandle implements NioHandle {
             }
         }
 
+        // set context
+        if (authSupport) {
+            clientContext.setSocksAuthMethod(SocksAuthMethod.NO_AUTH);
+        } else {
+            clientContext.setSocksAuthMethod(SocksAuthMethod.NO_ACCEPTABLE_METHODS);
+        }
+
         // write
         final ByteBuffer writeBuffer;
         try {
@@ -125,17 +132,13 @@ public class ClientNioHandle implements NioHandle {
         }
 
         writeBuffer.put(SocksVersion.VERSION_5);
-        if (!authSupport) {
+        if (authSupport) {
+            writeBuffer.put(SocksAuthMethod.NO_AUTH);
+        } else {
             logger.warn("SOCKS验证协议不支持");
-
             writeBuffer.put(SocksAuthMethod.NO_ACCEPTABLE_METHODS);
-            clientContext.setSocksAuthMethod(SocksAuthMethod.NO_ACCEPTABLE_METHODS);
-
             cubeContext.cancelAfterWrite();
             return;
-        } else {
-            writeBuffer.put(SocksAuthMethod.NO_AUTH);
-            clientContext.setSocksAuthMethod(SocksAuthMethod.NO_AUTH);
         }
 
         // change state
@@ -231,6 +234,7 @@ public class ClientNioHandle implements NioHandle {
             return;
         }
 
+        // set context
         clientContext.setCommand(command);
 
         if (clientConfig.getLocalDnsResolve() && addressType == SocksRequest.ATYP_DOMAIN_NAME) {
@@ -261,6 +265,7 @@ public class ClientNioHandle implements NioHandle {
 
         clientContext.setPort(port);
 
+        // write
         InetAddress localBindAddress = clientConfig.getBindAddress();
         short portShort = (short) clientConfig.getBindPort().intValue();
 
@@ -277,7 +282,6 @@ public class ClientNioHandle implements NioHandle {
             throw new ClientRuntimeException("本地监听地址类型不支持");
         }
 
-        // write
         final ByteBuffer writeBuffer;
         try {
             writeBuffer = cubeContext.readyWrite();
