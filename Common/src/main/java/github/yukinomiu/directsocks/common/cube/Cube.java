@@ -41,12 +41,12 @@ public class Cube implements LifeCycle {
     @Override
     public synchronized void shutdown() {
         if (state != State.RUNNING) throw new CubeStateException();
-        state = State.STOPING;
+        state = State.STOPPING;
 
         dispatcher.shutdown();
         docker.shutdown();
 
-        state = State.STOPED;
+        state = State.STOPPED;
         logger.debug("Cube成功关闭");
     }
 }

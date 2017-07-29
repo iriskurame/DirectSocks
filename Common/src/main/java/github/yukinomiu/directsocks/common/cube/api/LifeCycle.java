@@ -6,7 +6,7 @@ package github.yukinomiu.directsocks.common.cube.api;
  */
 public interface LifeCycle {
     enum State {
-        NEW, STARTING, RUNNING, STOPING, STOPED
+        NEW, STARTING, RUNNING, STOPPING, STOPPED
     }
 
     void start();

@@ -1,4 +1,4 @@
-package github.yukinomiu.directsocks.common.cube.exception;
+package github.yukinomiu.directsocks.common.cube.cachepool;
 
 /**
  * Yukinomiu

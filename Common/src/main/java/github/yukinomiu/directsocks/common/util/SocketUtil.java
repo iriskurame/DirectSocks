@@ -40,7 +40,23 @@ public final class SocketUtil {
         return String.format("Local<%s:%s> <==========> Remote<%s:%s>", localAddress, localPort, remoteAddress, remotePort);
     }
 
+    public static String getRemoteIPString(final Socket socket) {
+        return socket.getInetAddress().getHostAddress();
+    }
+
+    public static String getLocalIPString(final Socket socket) {
+        return socket.getLocalAddress().getHostAddress();
+    }
+
     public static String toString(final SocketChannel socketChannel) {
         return toString(socketChannel.socket());
+    }
+
+    public static String getRemoteIPString(final SocketChannel socketChannel) {
+        return getRemoteIPString(socketChannel.socket());
+    }
+
+    public static String getLocalIPString(final SocketChannel socketChannel) {
+        return getLocalIPString(socketChannel.socket());
     }
 }

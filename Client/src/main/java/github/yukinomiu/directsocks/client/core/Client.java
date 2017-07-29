@@ -18,14 +18,13 @@ public class Client implements LifeCycle {
 
     private LifeCycle.State state;
 
-    private final NioHandle clientNioHandle;
     private final Cube cube;
 
     public Client(final ClientConfig clientConfig) throws ClientInitException {
         state = LifeCycle.State.NEW;
         checkConfig(clientConfig);
 
-        clientNioHandle = new ClientNioHandle(clientConfig);
+        NioHandle clientNioHandle = new ClientNioHandle(clientConfig);
         try {
             cube = new Cube(clientConfig, clientNioHandle);
         } catch (CubeInitException e) {
@@ -48,11 +47,11 @@ public class Client implements LifeCycle {
     @Override
     public synchronized void shutdown() {
         if (state != State.RUNNING) throw new ClientStateException();
-        state = State.STOPING;
+        state = State.STOPPING;
 
         cube.shutdown();
 
-        state = State.STOPED;
+        state = State.STOPPED;
         logger.debug("Client成功关闭");
     }
 

@@ -52,13 +52,12 @@ public class Docker implements LifeCycle {
     @Override
     public synchronized void shutdown() {
         if (state != State.RUNNING) throw new CubeStateException();
-        state = State.STOPING;
+        state = State.STOPPING;
 
         shutdownDocker();
 
-        state = State.STOPED;
+        state = State.STOPPED;
         logger.debug("Docker成功关闭");
-
     }
 
     private void checkConfig(final CubeConfig cubeConfig) throws DokerInitException {
@@ -91,7 +90,6 @@ public class Docker implements LifeCycle {
         }
 
         byteBufferCachePool.shutdown();
-
     }
 
     private Switcher select() {

@@ -1,5 +1,9 @@
 package github.yukinomiu.directsocks.server.launcher;
 
+import github.yukinomiu.directsocks.common.auth.CachedMD5TokenConverter;
+import github.yukinomiu.directsocks.common.auth.DefaultTokenChecker;
+import github.yukinomiu.directsocks.common.auth.TokenChecker;
+import github.yukinomiu.directsocks.common.auth.TokenConverter;
 import github.yukinomiu.directsocks.server.core.Server;
 import github.yukinomiu.directsocks.server.core.ServerConfig;
 import github.yukinomiu.directsocks.server.exception.ServerInitException;
@@ -24,8 +28,13 @@ public class TestServerLauncher {
         final int localPort = 7070;
         final int backlog = 1000;
         final int workerCount = 3;
-        final int bufferSize = 1024;
-        final int poolSize = 64;
+        final int bufferSize = 1024 * 64;
+        final int poolSize = 128;
+        final TokenConverter tokenConverter = new CachedMD5TokenConverter();
+        final TokenChecker tokenChecker = new DefaultTokenChecker(tokenConverter);
+
+        // add keys
+        tokenChecker.add("test");
 
         // config
         ServerConfig config = new ServerConfig();
@@ -42,6 +51,8 @@ public class TestServerLauncher {
         config.setWorkerCount(workerCount);
         config.setBufferSize(bufferSize);
         config.setPoolSize(poolSize);
+        config.setTokenConverter(tokenConverter);
+        config.setTokenChecker(tokenChecker);
 
         // start server
         Server server;

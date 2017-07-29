@@ -1,7 +1,6 @@
 package github.yukinomiu.directsocks.common.cube.cachepool;
 
 import github.yukinomiu.directsocks.common.cube.CubeConfig;
-import github.yukinomiu.directsocks.common.cube.exception.ByteBufferCachePoolInitException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,7 +14,6 @@ import java.util.concurrent.locks.ReentrantLock;
 public class SimpleByteBufferCachePool implements ByteBufferCachePool {
     private static final Logger logger = LoggerFactory.getLogger(SimpleByteBufferCachePool.class);
 
-    private final CubeConfig cubeConfig;
     private final ByteBufferCachePoolFactory factory;
     private final ReentrantLock lock = new ReentrantLock();
     private final ByteBuffer[] stack;
@@ -27,11 +25,10 @@ public class SimpleByteBufferCachePool implements ByteBufferCachePool {
 
     public SimpleByteBufferCachePool(final CubeConfig cubeConfig) throws ByteBufferCachePoolInitException {
         checkConfig(cubeConfig);
-        this.cubeConfig = cubeConfig;
 
-        factory = new SimpleByteBufferCachePoolFactory(this.cubeConfig);
+        factory = new SimpleByteBufferCachePoolFactory(cubeConfig);
 
-        stack = new ByteBuffer[this.cubeConfig.getPoolSize()];
+        stack = new ByteBuffer[cubeConfig.getPoolSize()];
         for (int i = 0; i < stack.length; i++) {
             stack[i] = factory.create();
         }
@@ -106,7 +103,7 @@ public class SimpleByteBufferCachePool implements ByteBufferCachePool {
     @Override
     public void shutdown() {
         factory.shutdown();
-        logger.debug("getCount={}, returnCount={}", getCount, returnCount);
+        logger.debug("{}: getCount={}, returnCount={}", this, getCount, returnCount);
     }
 
     private void checkConfig(final CubeConfig cubeConfig) throws ByteBufferCachePoolInitException {

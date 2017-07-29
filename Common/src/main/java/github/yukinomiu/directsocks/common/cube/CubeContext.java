@@ -2,11 +2,13 @@ package github.yukinomiu.directsocks.common.cube;
 
 import github.yukinomiu.directsocks.common.cube.api.CloseableAttachment;
 import github.yukinomiu.directsocks.common.cube.cachepool.ByteBufferCachePool;
-import github.yukinomiu.directsocks.common.cube.exception.NotYetWriteException;
+import github.yukinomiu.directsocks.common.cube.exception.CubeConnectionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -30,6 +32,7 @@ public class CubeContext {
 
     private boolean writeFlag = false;
     private boolean cancelAfterWriteFlag = false;
+    private boolean cancelFlag = false;
 
     private CloseableAttachment attachment;
 
@@ -61,6 +64,11 @@ public class CubeContext {
         selectionKey.interestOps(selectionKey.interestOps() & (~SelectionKey.OP_WRITE));
     }
 
+    void finishConnect() {
+        selectionKey.interestOps(selectionKey.interestOps() & (~SelectionKey.OP_CONNECT));
+        selectionKey.interestOps(selectionKey.interestOps() | SelectionKey.OP_READ);
+    }
+
     public ByteBuffer getReadBuffer() {
         return readBuffer;
     }
@@ -69,9 +77,9 @@ public class CubeContext {
         return writeBuffer;
     }
 
-    public ByteBuffer readyWrite() throws NotYetWriteException {
+    public ByteBuffer readyWrite() {
         if (writeFlag) {
-            throw new NotYetWriteException();
+            return writeBuffer;
         }
 
         writeFlag = true;
@@ -82,6 +90,9 @@ public class CubeContext {
     }
 
     public void cancel() {
+        if (cancelFlag) return;
+
+        cancelFlag = true;
         SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
 
         selectionKey.cancel();
@@ -115,19 +126,53 @@ public class CubeContext {
         cancelAfterWriteFlag = true;
     }
 
-    public void registerNewSocketChannel(final SocketChannel socketChannel, final CloseableAttachment attachment) throws IOException {
-        if (socketChannel == null) throw new NullPointerException("SocketChannel为空");
-        socketChannel.configureBlocking(false);
+    public CubeContext connectAndRegisterNewSocketChannel(final SocketAddress remoteAddress, final CloseableAttachment attachment) throws CubeConnectionException {
+        if (remoteAddress == null) throw new NullPointerException("SocketAddress为空");
 
-        SelectionKey selectionKey = socketChannel.register(selector, SelectionKey.OP_READ);
-        CubeContext cubeContext = new CubeContext(selectionKey, selector, lock, byteBufferCachePool);
-        selectionKey.attach(cubeContext);
+        CubeContext cubeContext = null;
+        try {
+            SocketChannel socketChannel = SocketChannel.open();
+            socketChannel.configureBlocking(false);
 
-        cubeContext.attach(attachment);
+            SelectionKey selectionKey = socketChannel.register(selector, SelectionKey.OP_CONNECT);
+            cubeContext = new CubeContext(selectionKey, selector, lock, byteBufferCachePool);
+            selectionKey.attach(cubeContext);
+            cubeContext.attach(attachment);
+
+            socketChannel.connect(remoteAddress);
+        } catch (IOException e) {
+            if (cubeContext != null) {
+                cubeContext.cancel();
+            }
+
+            throw new CubeConnectionException("连接异常", e);
+        }
+
+        return cubeContext;
     }
 
-    public void registerNewSocketChannel(final SocketChannel socketChannel) throws IOException {
-        registerNewSocketChannel(socketChannel, null);
+    public CubeContext connectAndRegisterNewSocketChannel(final SocketAddress remoteAddress) throws CubeConnectionException {
+        return connectAndRegisterNewSocketChannel(remoteAddress, null);
+    }
+
+    public InetAddress getRemoteAddress() {
+        SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
+        return socketChannel.socket().getInetAddress();
+    }
+
+    public int getRemotePort() {
+        SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
+        return socketChannel.socket().getPort();
+    }
+
+    public InetAddress getLocalAddress() {
+        SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
+        return socketChannel.socket().getLocalAddress();
+    }
+
+    public int getLocalPort() {
+        SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
+        return socketChannel.socket().getLocalPort();
     }
 
     public void attach(final CloseableAttachment attachment) {

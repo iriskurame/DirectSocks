@@ -3,6 +3,8 @@ package github.yukinomiu.directsocks.client.launcher;
 import github.yukinomiu.directsocks.client.core.Client;
 import github.yukinomiu.directsocks.client.core.ClientConfig;
 import github.yukinomiu.directsocks.client.exception.ClientInitException;
+import github.yukinomiu.directsocks.common.auth.CachedMD5TokenConverter;
+import github.yukinomiu.directsocks.common.auth.TokenConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,15 +26,21 @@ public class TestClientLauncher {
         final int localPort = 9090;
         final int backlog = 1000;
         final int workerCount = 3;
-        final int bufferSize = 1024;
-        final int poolSize = 64;
+        final int bufferSize = 1024 * 64;
+        final int poolSize = 128;
         final boolean localDnsResolve = true;
+        final String serverAddressName = "localhost";
+        final int serverPort = 7070;
+        final TokenConverter tokenConverter = new CachedMD5TokenConverter();
+        final String key = "test";
 
         // config
         ClientConfig config = new ClientConfig();
         InetAddress localAddress;
+        InetAddress serverAddress;
         try {
             localAddress = InetAddress.getByName(localAddressName);
+            serverAddress = InetAddress.getByName(serverAddressName);
         } catch (UnknownHostException e) {
             logger.error("本地绑定地址错误", e);
             return;
@@ -44,6 +52,10 @@ public class TestClientLauncher {
         config.setBufferSize(bufferSize);
         config.setPoolSize(poolSize);
         config.setLocalDnsResolve(localDnsResolve);
+        config.setServerAddress(serverAddress);
+        config.setServerPort(serverPort);
+        config.setTokenConverter(tokenConverter);
+        config.setKey(key);
 
         // start client
         Client client;

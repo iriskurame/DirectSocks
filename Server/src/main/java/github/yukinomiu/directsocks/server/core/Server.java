@@ -18,14 +18,13 @@ public class Server implements LifeCycle {
 
     private LifeCycle.State state;
 
-    private final NioHandle serverNioHandle;
     private final Cube cube;
 
     public Server(final ServerConfig serverConfig) throws ServerInitException {
         state = LifeCycle.State.NEW;
         checkConfig(serverConfig);
 
-        serverNioHandle = new ServerNioHandle(serverConfig);
+        NioHandle serverNioHandle = new ServerNioHandle(serverConfig);
         try {
             cube = new Cube(serverConfig, serverNioHandle);
         } catch (CubeInitException e) {
@@ -48,11 +47,11 @@ public class Server implements LifeCycle {
     @Override
     public void shutdown() {
         if (state != State.RUNNING) throw new ServerStateException();
-        state = State.STOPING;
+        state = State.STOPPING;
 
         cube.shutdown();
 
-        state = State.STOPED;
+        state = State.STOPPED;
         logger.debug("Server成功关闭");
     }
 

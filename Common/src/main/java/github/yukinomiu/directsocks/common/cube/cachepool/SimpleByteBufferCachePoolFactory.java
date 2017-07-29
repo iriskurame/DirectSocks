@@ -1,7 +1,6 @@
 package github.yukinomiu.directsocks.common.cube.cachepool;
 
 import github.yukinomiu.directsocks.common.cube.CubeConfig;
-import github.yukinomiu.directsocks.common.cube.exception.ByteBufferCachePoolFactoryInitException;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

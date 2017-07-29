@@ -21,7 +21,6 @@ public class Dispatcher implements LifeCycle {
     private static Logger logger = LoggerFactory.getLogger(Dispatcher.class);
 
     private LifeCycle.State state;
-    private final CubeConfig cubeConfig;
     private final Docker docker;
 
     private final Selector dispatcherSelector;
@@ -34,9 +33,7 @@ public class Dispatcher implements LifeCycle {
         state = LifeCycle.State.NEW;
         checkConfig(cubeConfig);
 
-        this.cubeConfig = cubeConfig;
         this.docker = docker;
-
 
         try {
             // init selector
@@ -51,9 +48,9 @@ public class Dispatcher implements LifeCycle {
         }
 
         // bind server socket
-        InetAddress bindAddress = this.cubeConfig.getBindAddress();
-        int bindPort = this.cubeConfig.getBindPort();
-        int backlog = this.cubeConfig.getBacklog();
+        InetAddress bindAddress = cubeConfig.getBindAddress();
+        int bindPort = cubeConfig.getBindPort();
+        int backlog = cubeConfig.getBacklog();
 
         serverSocket = serverSocketChannel.socket();
         try {
@@ -70,8 +67,8 @@ public class Dispatcher implements LifeCycle {
         try {
             serverSocketChannel.register(dispatcherSelector, SelectionKey.OP_ACCEPT);
         } catch (ClosedChannelException e) {
-            logger.error("ServerSocketChannel ClosedChannelException异常", e);
-            throw new CubeInitException("ServerSocketChannel ClosedChannelException异常", e);
+            logger.error("ServerSocketChannel已经关闭", e);
+            throw new CubeInitException("ServerSocketChannel已经关闭", e);
         }
     }
 
@@ -89,11 +86,11 @@ public class Dispatcher implements LifeCycle {
     @Override
     public synchronized void shutdown() {
         if (state != State.RUNNING) throw new CubeStateException();
-        state = State.STOPING;
+        state = State.STOPPING;
 
         shutdownDispatcher();
 
-        state = State.STOPED;
+        state = State.STOPPED;
         logger.debug("Dispatcher成功关闭");
     }
 
@@ -103,7 +100,7 @@ public class Dispatcher implements LifeCycle {
         InetAddress bindAddress = cubeConfig.getBindAddress();
         if (bindAddress == null) throw new DispatcherInitException("绑定地址不能为空");
         if (!(bindAddress instanceof Inet4Address) && !(bindAddress instanceof Inet6Address))
-            throw new DispatcherInitException("端绑定地址类型不支持, 仅支持IPv4 和 IPv6 地址");
+            throw new DispatcherInitException("端绑定地址类型不支持, 仅支持 IPv4 和 IPv6 地址");
 
         Integer bindPort = cubeConfig.getBindPort();
         if (bindPort == null) throw new DispatcherInitException("绑定端口不能为空");
