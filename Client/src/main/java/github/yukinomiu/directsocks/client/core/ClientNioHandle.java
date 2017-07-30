@@ -152,6 +152,7 @@ public class ClientNioHandle implements NioHandle {
         final ByteBuffer writeBuffer = cubeContext.readyWrite();
         writeBuffer.put(SocksVersion.VERSION_5);
         writeBuffer.put(SocksAuthMethod.NO_AUTH);
+        cubeContext.readAfterWrite();
 
         // change state
         localRoleContext.setLocalState(LocalState.SOCKS_PROXY);
@@ -249,9 +250,9 @@ public class ClientNioHandle implements NioHandle {
 
         // set context
         if (clientConfig.getLocalDnsResolve() && addressType == SocksAddressType.DOMAIN_NAME) {
-            String host = new String(address, StandardCharsets.US_ASCII);
+            String targetHost = new String(address, StandardCharsets.US_ASCII);
             try {
-                InetAddress targetAddress = InetAddress.getByName(host);
+                InetAddress targetAddress = InetAddress.getByName(targetHost);
 
                 if (targetAddress instanceof Inet4Address) {
                     addressType = SocksAddressType.IPV4;
@@ -265,7 +266,7 @@ public class ClientNioHandle implements NioHandle {
                     throw new ClientRuntimeException("本地解析地址类型不支持");
                 }
             } catch (UnknownHostException e) {
-                logger.warn("域名 {} 本地解析失败", host);
+                logger.warn("域名 {} 本地解析失败", targetHost);
             }
         }
 
@@ -291,7 +292,7 @@ public class ClientNioHandle implements NioHandle {
             Integer serverPort = clientConfig.getServerPort();
             SocketAddress serverSocketAddress = new InetSocketAddress(serverAddress, serverPort);
 
-            CubeContext serverCubeContext = cubeContext.connectAndRegisterNewSocketChannel(serverSocketAddress);
+            CubeContext serverCubeContext = cubeContext.readyConnect(serverSocketAddress);
 
             ClientContext serverClientContext = new ClientContext(ClientChannelRole.SERVER_ROLE);
             ServerRoleContext serverRoleContext = (ServerRoleContext) serverClientContext.getCurrentChannelContext();
@@ -321,6 +322,8 @@ public class ClientNioHandle implements NioHandle {
         final ByteBuffer readBuffer = cubeContext.getReadBuffer();
         final ByteBuffer writeBuffer = serverCubeContext.readyWrite();
         writeBuffer.put(readBuffer);
+        serverCubeContext.readAfterWrite();
+        serverCubeContext.contextReadAfterWrite(cubeContext);
     }
 
     private void handleServerDirectSocksRead(final CubeContext cubeContext,
@@ -333,6 +336,8 @@ public class ClientNioHandle implements NioHandle {
         final ByteBuffer readBuffer = cubeContext.getReadBuffer();
         final ByteBuffer writeBuffer = localCubeContext.readyWrite();
         writeBuffer.put(readBuffer);
+        localCubeContext.readAfterWrite();
+        localCubeContext.contextReadAfterWrite(cubeContext);
     }
 
     private void handleServerDirectSocksAuthRead(final CubeContext cubeContext,
@@ -432,6 +437,7 @@ public class ClientNioHandle implements NioHandle {
                 writeBuffer.put(socksAddressType);
                 writeBuffer.put(address);
                 writeBuffer.put(port);
+                localCubeContext.readAfterWrite();
 
                 // change state
                 serverRoleContext.setServerState(ServerState.DIRECT_SOCKS);
@@ -442,7 +448,7 @@ public class ClientNioHandle implements NioHandle {
             }
 
             case DirectSocksReply.AUTH_FAIL: {
-                logger.warn("认证失败");
+                logger.warn("服务端认证失败");
                 cancelAndReply(cubeContext, localCubeContext, SocksReply.CONNECTION_NOT_ALLOWED);
                 return;
             }
@@ -454,13 +460,13 @@ public class ClientNioHandle implements NioHandle {
             }
 
             case DirectSocksReply.NETWORK_UNREACHABLE: {
-                logger.warn("网络不可达");
+                logger.warn("服务端网络不可达");
                 cancelAndReply(cubeContext, localCubeContext, SocksReply.NETWORK_UNREACHABLE);
                 return;
             }
 
             case DirectSocksReply.HOST_UNREACHABLE: {
-                logger.warn("主机不可达");
+                logger.warn("服务端主机不可达");
                 cancelAndReply(cubeContext, localCubeContext, SocksReply.HOST_UNREACHABLE);
                 return;
             }
@@ -538,11 +544,12 @@ public class ClientNioHandle implements NioHandle {
         }
         writeBuffer.put(address);
         writeBuffer.put(port);
+        cubeContext.readAfterWrite();
     }
 
     @Override
     public void handleConnectedFail(CubeContext cubeContext, CubeConnectionException cubeConnectionException) {
-        logger.warn("连接服务端异常", cubeConnectionException);
+        logger.warn("连接服务端异常", cubeConnectionException.getMessage());
         cubeContext.cancel();
 
         ClientContext serverClientContext = (ClientContext) cubeContext.attachment();

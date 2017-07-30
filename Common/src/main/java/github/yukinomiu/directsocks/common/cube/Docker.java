@@ -34,7 +34,7 @@ public class Docker implements LifeCycle {
         workerCount = cubeConfig.getWorkerCount();
         switchers = new Switcher[workerCount];
         for (int i = 0; i < workerCount; i++) {
-            switchers[i] = new Switcher(byteBufferCachePool, nioHandle);
+            switchers[i] = new Switcher(cubeConfig, byteBufferCachePool, nioHandle);
         }
     }
 

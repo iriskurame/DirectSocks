@@ -53,7 +53,7 @@ public class SimpleByteBufferCachePoolFactory implements ByteBufferCachePoolFact
 
         Integer bufferSize = cubeConfig.getBufferSize();
         if (bufferSize == null) throw new ByteBufferCachePoolFactoryInitException("Buffer长度不能为空");
-        if (bufferSize < 22 || bufferSize > 102400)
+        if (bufferSize < 1024 || bufferSize > 1024 * 512)
             throw new ByteBufferCachePoolFactoryInitException("Buffer长度必须在[22, 102400]之间取值");
     }
 }

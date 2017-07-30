@@ -22,12 +22,15 @@ public class TestClientLauncher {
     private static final Logger logger = LoggerFactory.getLogger(TestClientLauncher.class);
 
     public static void main(String[] args) {
-        final String localAddressName = "localhost";
-        final int localPort = 9090;
+        final String bindAddressName = "localhost";
+        final int bindPort = 9090;
         final int backlog = 1000;
         final int workerCount = 3;
+        final boolean tcpNoDelay = true;
+        final boolean tcpKeepAlive = true;
         final int bufferSize = 1024 * 64;
-        final int poolSize = 128;
+        final int poolSize = 512;
+
         final boolean localDnsResolve = true;
         final String serverAddressName = "localhost";
         final int serverPort = 7070;
@@ -36,21 +39,24 @@ public class TestClientLauncher {
 
         // config
         ClientConfig config = new ClientConfig();
-        InetAddress localAddress;
+        InetAddress bindAddress;
         InetAddress serverAddress;
         try {
-            localAddress = InetAddress.getByName(localAddressName);
+            bindAddress = InetAddress.getByName(bindAddressName);
             serverAddress = InetAddress.getByName(serverAddressName);
         } catch (UnknownHostException e) {
-            logger.error("本地绑定地址错误", e);
+            logger.error("地址解析错误", e);
             return;
         }
-        config.setBindAddress(localAddress);
-        config.setBindPort(localPort);
+        config.setBindAddress(bindAddress);
+        config.setBindPort(bindPort);
         config.setBacklog(backlog);
         config.setWorkerCount(workerCount);
+        config.setTcpNoDelay(tcpNoDelay);
+        config.setTcpKeepAlive(tcpKeepAlive);
         config.setBufferSize(bufferSize);
         config.setPoolSize(poolSize);
+
         config.setLocalDnsResolve(localDnsResolve);
         config.setServerAddress(serverAddress);
         config.setServerPort(serverPort);

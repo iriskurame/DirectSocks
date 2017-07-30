@@ -15,6 +15,10 @@ public class CubeConfig {
     // docker config
     private Integer workerCount;
 
+    // switcher config
+    private Boolean tcpNoDelay;
+    private Boolean tcpKeepAlive;
+
     // buffer config
     private Integer bufferSize;
     private Integer poolSize;
@@ -49,6 +53,22 @@ public class CubeConfig {
 
     public void setWorkerCount(Integer workerCount) {
         this.workerCount = workerCount;
+    }
+
+    public Boolean getTcpNoDelay() {
+        return tcpNoDelay;
+    }
+
+    public void setTcpNoDelay(Boolean tcpNoDelay) {
+        this.tcpNoDelay = tcpNoDelay;
+    }
+
+    public Boolean getTcpKeepAlive() {
+        return tcpKeepAlive;
+    }
+
+    public void setTcpKeepAlive(Boolean tcpKeepAlive) {
+        this.tcpKeepAlive = tcpKeepAlive;
     }
 
     public Integer getBufferSize() {

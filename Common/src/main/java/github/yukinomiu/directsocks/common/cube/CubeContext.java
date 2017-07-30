@@ -11,9 +11,7 @@ import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.locks.Lock;
 
 /**
  * Yukinomiu
@@ -22,41 +20,58 @@ import java.util.concurrent.locks.Lock;
 public class CubeContext {
     private static final Logger logger = LoggerFactory.getLogger(CubeContext.class);
 
+    private final Switcher switcher;
     private final SelectionKey selectionKey;
-    private final Selector selector;
-    private final Lock lock;
     private final ByteBufferCachePool byteBufferCachePool;
 
     private ByteBuffer readBuffer;
     private ByteBuffer writeBuffer;
 
+    private boolean readFlag = false;
     private boolean writeFlag = false;
-    private boolean cancelAfterWriteFlag = false;
     private boolean cancelFlag = false;
+
+    private boolean cancelAfterWriteFlag = false;
+    private boolean readAfterWriteFlag = false;
+
+    private boolean contextReadAfterWriteFlag = false;
+    private CubeContext context;
 
     private CloseableAttachment attachment;
 
-    CubeContext(final SelectionKey selectionKey,
-                final Selector selector,
-                final Lock lock,
+    CubeContext(final Switcher switcher,
+                final SelectionKey selectionKey,
                 final ByteBufferCachePool byteBufferCachePool) {
 
+        this.switcher = switcher;
         this.selectionKey = selectionKey;
-        this.selector = selector;
-        this.lock = lock;
         this.byteBufferCachePool = byteBufferCachePool;
 
         readBuffer = byteBufferCachePool.get();
         writeBuffer = byteBufferCachePool.get();
     }
 
-    boolean isCancelAfterWriteFlag() {
-        return cancelAfterWriteFlag;
+    boolean getAndTurnOffCancelAfterWriteFlag() {
+        boolean old = cancelAfterWriteFlag;
+        cancelAfterWriteFlag = false;
+        return old;
     }
 
-    ByteBuffer readyRead() {
-        byteBufferCachePool.refresh(readBuffer);
-        return readBuffer;
+    boolean getAndTurnOffReadAfterWriteFlag() {
+        boolean old = readAfterWriteFlag;
+        readAfterWriteFlag = false;
+        return old;
+    }
+
+    boolean getAndTurnOffContextReadAfterWriteFlag() {
+        boolean old = contextReadAfterWriteFlag;
+        contextReadAfterWriteFlag = false;
+        return old;
+    }
+
+    void finishRead() {
+        readFlag = false;
+        selectionKey.interestOps(selectionKey.interestOps() & (~SelectionKey.OP_READ));
     }
 
     void finishWrite() {
@@ -66,15 +81,21 @@ public class CubeContext {
 
     void finishConnect() {
         selectionKey.interestOps(selectionKey.interestOps() & (~SelectionKey.OP_CONNECT));
+    }
+
+    void finishContextReadAfterWrite() {
+        context.readyRead();
+    }
+
+    public void readyRead() {
+        if (readFlag) {
+            return;
+        }
+
+        readFlag = true;
         selectionKey.interestOps(selectionKey.interestOps() | SelectionKey.OP_READ);
-    }
 
-    public ByteBuffer getReadBuffer() {
-        return readBuffer;
-    }
-
-    public ByteBuffer getWriteBuffer() {
-        return writeBuffer;
+        byteBufferCachePool.refresh(readBuffer);
     }
 
     public ByteBuffer readyWrite() {
@@ -86,6 +107,32 @@ public class CubeContext {
         selectionKey.interestOps(selectionKey.interestOps() | SelectionKey.OP_WRITE);
 
         byteBufferCachePool.refresh(writeBuffer);
+        return writeBuffer;
+    }
+
+    public CubeContext readyConnect(final SocketAddress remoteAddress) throws CubeConnectionException {
+        if (remoteAddress == null) throw new NullPointerException("SocketAddress为空");
+
+        CubeContext newCubeContext = switcher.registerNewSocketChannel();
+        SelectionKey newSelectionKey = newCubeContext.selectionKey;
+        SocketChannel newSocketChannel = (SocketChannel) newSelectionKey.channel();
+
+        newSelectionKey.interestOps(newSelectionKey.interestOps() | SelectionKey.OP_CONNECT);
+        try {
+            newSocketChannel.connect(remoteAddress);
+        } catch (Exception e) {
+            newCubeContext.cancel();
+            throw new CubeConnectionException("连接异常", e);
+        }
+
+        return newCubeContext;
+    }
+
+    public ByteBuffer getReadBuffer() {
+        return readBuffer;
+    }
+
+    public ByteBuffer getWriteBuffer() {
         return writeBuffer;
     }
 
@@ -126,33 +173,15 @@ public class CubeContext {
         cancelAfterWriteFlag = true;
     }
 
-    public CubeContext connectAndRegisterNewSocketChannel(final SocketAddress remoteAddress, final CloseableAttachment attachment) throws CubeConnectionException {
-        if (remoteAddress == null) throw new NullPointerException("SocketAddress为空");
-
-        CubeContext cubeContext = null;
-        try {
-            SocketChannel socketChannel = SocketChannel.open();
-            socketChannel.configureBlocking(false);
-
-            SelectionKey selectionKey = socketChannel.register(selector, SelectionKey.OP_CONNECT);
-            cubeContext = new CubeContext(selectionKey, selector, lock, byteBufferCachePool);
-            selectionKey.attach(cubeContext);
-            cubeContext.attach(attachment);
-
-            socketChannel.connect(remoteAddress);
-        } catch (IOException e) {
-            if (cubeContext != null) {
-                cubeContext.cancel();
-            }
-
-            throw new CubeConnectionException("连接异常", e);
-        }
-
-        return cubeContext;
+    public void readAfterWrite() {
+        readAfterWriteFlag = true;
     }
 
-    public CubeContext connectAndRegisterNewSocketChannel(final SocketAddress remoteAddress) throws CubeConnectionException {
-        return connectAndRegisterNewSocketChannel(remoteAddress, null);
+    public void contextReadAfterWrite(final CubeContext cubeContext) {
+        if (cubeContext == null) throw new NullPointerException("CubeContext为空");
+
+        contextReadAfterWriteFlag = true;
+        context = cubeContext;
     }
 
     public InetAddress getRemoteAddress() {

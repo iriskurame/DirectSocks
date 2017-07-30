@@ -24,35 +24,41 @@ public class TestServerLauncher {
     private static final Logger logger = LoggerFactory.getLogger(TestServerLauncher.class);
 
     public static void main(String[] args) {
-        final String localAddressName = "localhost";
-        final int localPort = 7070;
+        final String bindAddressName = "localhost";
+        final int bindPort = 7070;
         final int backlog = 1000;
         final int workerCount = 3;
+        final boolean tcpNoDelay = true;
+        final boolean tcpKeepAlive = true;
         final int bufferSize = 1024 * 64;
-        final int poolSize = 128;
+        final int poolSize = 512;
+
         final TokenConverter tokenConverter = new CachedMD5TokenConverter();
         final TokenChecker tokenChecker = new DefaultTokenChecker(tokenConverter);
 
-        // add keys
-        tokenChecker.add("test");
-
         // config
         ServerConfig config = new ServerConfig();
-        InetAddress localAddress;
+        InetAddress bindAddress;
         try {
-            localAddress = InetAddress.getByName(localAddressName);
+            bindAddress = InetAddress.getByName(bindAddressName);
         } catch (UnknownHostException e) {
-            logger.error("本地绑定地址错误", e);
+            logger.error("地址解析错误", e);
             return;
         }
-        config.setBindAddress(localAddress);
-        config.setBindPort(localPort);
+        config.setBindAddress(bindAddress);
+        config.setBindPort(bindPort);
         config.setBacklog(backlog);
         config.setWorkerCount(workerCount);
+        config.setTcpNoDelay(tcpNoDelay);
+        config.setTcpKeepAlive(tcpKeepAlive);
         config.setBufferSize(bufferSize);
         config.setPoolSize(poolSize);
+
         config.setTokenConverter(tokenConverter);
         config.setTokenChecker(tokenChecker);
+
+        // add keys
+        tokenChecker.add("test");
 
         // start server
         Server server;
