@@ -272,10 +272,10 @@ public class Switcher implements LifeCycle {
             if (logger.isWarnEnabled()) {
                 String remoteAddressString = cubeContext.getRemoteAddress().getHostAddress();
                 String remoteIPString = String.valueOf(cubeContext.getRemotePort());
-                logger.warn("connect remote host {}:{} exception", remoteAddressString, remoteIPString);
+                logger.warn("connect remote host {}:{} IO exception", remoteAddressString, remoteIPString);
             }
 
-            CubeConnectionException cubeConnectionException = new CubeConnectionException("connection exception", ioe);
+            CubeConnectionException cubeConnectionException = new CubeConnectionException("connection exception: " + ioe.getMessage(), ioe);
             try {
                 nioHandle.handleConnectedFail(cubeContext, cubeConnectionException);
             } catch (Exception e) {
