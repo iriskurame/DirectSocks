@@ -177,7 +177,7 @@ public class Switcher implements LifeCycle {
         try {
             n = socketChannel.read(readBuffer);
         } catch (IOException e) {
-            logger.error("read exception: {}, connection will be closed", e.getMessage());
+            logger.error("read exception, connection will be closed", e);
             cubeContext.cancel();
             return;
         }
@@ -200,7 +200,7 @@ public class Switcher implements LifeCycle {
             logger.debug("connection is closed");
             cubeContext.cancel();
         } catch (Exception e) {
-            logger.error("NioHandle read exception: {}, connection will be closed", e.getMessage());
+            logger.error("NioHandle read exception, connection will be closed", e);
             cubeContext.cancel();
         }
 
@@ -215,7 +215,7 @@ public class Switcher implements LifeCycle {
         try {
             socketChannel.write(writeBuffer);
         } catch (IOException e) {
-            logger.error("write exception: {}, connection will be closed", e.getMessage());
+            logger.error("write exception, connection will be closed", e);
             cubeContext.cancel();
             return;
         }
@@ -264,7 +264,7 @@ public class Switcher implements LifeCycle {
             try {
                 nioHandle.handleConnectedSuccess(cubeContext);
             } catch (Exception e) {
-                logger.error("NioHandle connection success exception: {}, connection will be closed", e.getMessage());
+                logger.error("NioHandle connection success exception, connection will be closed", e);
                 cubeContext.cancel();
             }
         } catch (IOException ioe) {
@@ -279,7 +279,7 @@ public class Switcher implements LifeCycle {
             try {
                 nioHandle.handleConnectedFail(cubeContext, cubeConnectionException);
             } catch (Exception e) {
-                logger.error("NioHandle connection fail exception: {}, connection will be closed", e.getMessage());
+                logger.error("NioHandle connection fail exception, connection will be closed", e);
                 cubeContext.cancel();
                 return;
             }
