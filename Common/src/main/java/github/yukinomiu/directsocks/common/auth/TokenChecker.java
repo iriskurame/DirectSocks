@@ -7,9 +7,13 @@ package github.yukinomiu.directsocks.common.auth;
 public interface TokenChecker {
     boolean check(final byte[] token);
 
+    boolean check(final String key);
+
     void add(final String[] keys);
 
     void add(final String key);
 
-    void delete(final String key);
+    boolean remove(final String key);
+
+    String[] listKeys();
 }

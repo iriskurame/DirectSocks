@@ -43,8 +43,8 @@ public class Dispatcher implements LifeCycle {
             serverSocketChannel = ServerSocketChannel.open();
             serverSocketChannel.configureBlocking(false);
         } catch (IOException e) {
-            logger.error("Dispatcher IO异常", e);
-            throw new CubeInitException("Dispatcher IO异常", e);
+            logger.error("init dispatcher IO exception", e);
+            throw new CubeInitException("Dispatcher IO exception", e);
         }
 
         // bind server socket
@@ -56,19 +56,19 @@ public class Dispatcher implements LifeCycle {
         try {
             serverSocket.bind(new InetSocketAddress(bindAddress, bindPort), backlog);
         } catch (BindException e) {
-            logger.error("本地端口绑定异常, 端口可能已被占用", e);
-            throw new CubeInitException("本地端口绑定异常, 端口可能已被占用", e);
+            logger.error("bind local address exception: {}, the port {} may already in use", e.getMessage(), bindPort);
+            throw new CubeInitException("bind local address exception", e);
         } catch (IOException e) {
-            logger.error("ServerSocket IO异常", e);
-            throw new CubeInitException("ServerSocket IO异常", e);
+            logger.error("bind IO exception", e);
+            throw new CubeInitException("bind IO exception", e);
         }
 
         // register channel to selector
         try {
             serverSocketChannel.register(dispatcherSelector, SelectionKey.OP_ACCEPT);
         } catch (ClosedChannelException e) {
-            logger.error("ServerSocketChannel已经关闭", e);
-            throw new CubeInitException("ServerSocketChannel已经关闭", e);
+            logger.error("ServerSocketChannel already closed", e);
+            throw new CubeInitException("ServerSocketChannel already closed", e);
         }
     }
 
@@ -80,7 +80,7 @@ public class Dispatcher implements LifeCycle {
         startDispatcher();
 
         state = State.RUNNING;
-        logger.debug("Dispatcher成功开启");
+        logger.debug("Dispatcher started");
     }
 
     @Override
@@ -91,28 +91,28 @@ public class Dispatcher implements LifeCycle {
         shutdownDispatcher();
 
         state = State.STOPPED;
-        logger.debug("Dispatcher成功关闭");
+        logger.debug("Dispatcher closed");
     }
 
     private void checkConfig(final CubeConfig cubeConfig) throws DispatcherInitException {
-        if (cubeConfig == null) throw new DispatcherInitException("配置不能为空");
+        if (cubeConfig == null) throw new DispatcherInitException("config can not be null");
 
         InetAddress bindAddress = cubeConfig.getBindAddress();
-        if (bindAddress == null) throw new DispatcherInitException("绑定地址不能为空");
+        if (bindAddress == null) throw new DispatcherInitException("bind address can not be null");
         if (!(bindAddress instanceof Inet4Address) && !(bindAddress instanceof Inet6Address))
-            throw new DispatcherInitException("端绑定地址类型不支持, 仅支持 IPv4 和 IPv6 地址");
+            throw new DispatcherInitException("bind address type not supported");
 
         Integer bindPort = cubeConfig.getBindPort();
-        if (bindPort == null) throw new DispatcherInitException("绑定端口不能为空");
-        if (bindPort < 1 || bindPort > 65535) throw new DispatcherInitException("绑定端口非法, 端口必须在[1, 65535]之间取值");
+        if (bindPort == null) throw new DispatcherInitException("bind port can not be null");
+        if (bindPort < 1 || bindPort > 65535) throw new DispatcherInitException("bind port must in range 1-65535");
 
         Integer backlog = cubeConfig.getBacklog();
-        if (backlog == null) throw new DispatcherInitException("Backlog不能为空");
+        if (backlog == null) throw new DispatcherInitException("backlog can not be null");
     }
 
     private void startDispatcher() {
         dispatchThread = new Thread(() -> {
-            logger.debug("开始监听本地连接, 监听地址 {}:{}", serverSocket.getInetAddress().getHostAddress(), serverSocket.getLocalPort());
+            logger.debug("start listening at address {}:{}", serverSocket.getInetAddress().getHostAddress(), serverSocket.getLocalPort());
 
             while (true) {
                 try {
@@ -143,16 +143,16 @@ public class Dispatcher implements LifeCycle {
                     }
 
                 } catch (CancelledKeyException e) {
-                    logger.warn("连接已断开");
+                    logger.warn("connection is closed");
                 } catch (IOException e) {
-                    logger.error("Dispatcher IO异常", e);
+                    logger.error("Dispatcher IO exception", e);
                 } catch (Exception e) {
-                    logger.debug("Dispatcher异常", e);
+                    logger.debug("Dispatcher exception", e);
                     break;
                 }
             }
 
-            logger.debug("停止监听本地连接");
+            logger.debug("stop listening");
         });
 
         dispatchThread.setName("dispatcher thread");
@@ -168,13 +168,13 @@ public class Dispatcher implements LifeCycle {
         try {
             serverSocket.close();
         } catch (IOException e) {
-            logger.error("关闭ServerSocket异常", e);
+            logger.error("closing ServerSocket IO exception", e);
         }
 
         try {
             serverSocketChannel.close();
         } catch (IOException e) {
-            logger.error("关闭ServerSocketChannel异常", e);
+            logger.error("closing ServerSocketChannel IO exception", e);
         }
     }
 
@@ -184,7 +184,7 @@ public class Dispatcher implements LifeCycle {
             SocketChannel socketChannel = serverSocketChannel.accept();
             docker.accept(socketChannel);
         } catch (Exception e) {
-            logger.error("分发传入连接异常", e);
+            logger.error("dispatch request exception", e);
         }
     }
 }

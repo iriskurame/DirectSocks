@@ -11,46 +11,61 @@ import java.util.Set;
  * 2017/7/29
  */
 public class DefaultTokenChecker implements TokenChecker {
-    private final Set<Integer> set = new HashSet<>();
+    private final Set<Integer> tokenSet = new HashSet<>();
+    private final Set<String> keySet = new HashSet<>();
     private final TokenConverter tokenConverter;
 
     public DefaultTokenChecker(final TokenConverter tokenConverter) {
-        if (tokenConverter == null) throw new TokenCheckerRuntimeException("TokenConverter不能为空");
+        if (tokenConverter == null) throw new TokenCheckerRuntimeException("TokenConverter can not be null");
         this.tokenConverter = tokenConverter;
     }
 
     @Override
     public boolean check(final byte[] token) {
         int hashCode = Arrays.hashCode(token);
-        return set.contains(hashCode);
+        return tokenSet.contains(hashCode);
+    }
+
+    @Override
+    public boolean check(final String key) {
+        return keySet.contains(key);
     }
 
     @Override
     public void add(final String[] keys) {
-        synchronized (set) {
+        synchronized (tokenSet) {
             for (String key : keys) {
+                keySet.add(key);
                 byte[] token = tokenConverter.convertToken(key);
                 int hashCode = Arrays.hashCode(token);
-                set.add(hashCode);
+                tokenSet.add(hashCode);
             }
         }
     }
 
     @Override
     public void add(final String key) {
-        synchronized (set) {
+        synchronized (tokenSet) {
+            keySet.add(key);
             byte[] token = tokenConverter.convertToken(key);
             int hashCode = Arrays.hashCode(token);
-            set.add(hashCode);
+            tokenSet.add(hashCode);
         }
     }
 
     @Override
-    public void delete(final String key) {
-        synchronized (set) {
+    public boolean remove(final String key) {
+        synchronized (tokenSet) {
+            keySet.remove(key);
             byte[] token = tokenConverter.convertToken(key);
             int hashCode = Arrays.hashCode(token);
-            set.remove(hashCode);
+            return tokenSet.remove(hashCode);
         }
+    }
+
+    @Override
+    public String[] listKeys() {
+        String[] keys = new String[keySet.size()];
+        return keySet.toArray(keys);
     }
 }

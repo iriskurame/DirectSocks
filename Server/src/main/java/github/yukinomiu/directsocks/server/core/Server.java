@@ -28,8 +28,8 @@ public class Server implements LifeCycle {
         try {
             cube = new Cube(serverConfig, serverNioHandle);
         } catch (CubeInitException e) {
-            logger.error("初始化服务端异常", e);
-            throw new ServerInitException("初始化客户端异常", e);
+            logger.error("init Server exception", e);
+            throw new ServerInitException("init Server exception", e);
         }
     }
 
@@ -41,7 +41,7 @@ public class Server implements LifeCycle {
         cube.start();
 
         state = State.RUNNING;
-        logger.debug("Server成功启动");
+        logger.debug("Server started");
     }
 
     @Override
@@ -52,10 +52,10 @@ public class Server implements LifeCycle {
         cube.shutdown();
 
         state = State.STOPPED;
-        logger.debug("Server成功关闭");
+        logger.debug("Server closed");
     }
 
     private void checkConfig(final ServerConfig serverConfig) throws ServerInitException {
-        if (serverConfig == null) throw new ServerInitException("配置为空");
+        if (serverConfig == null) throw new ServerInitException("config can not be null");
     }
 }

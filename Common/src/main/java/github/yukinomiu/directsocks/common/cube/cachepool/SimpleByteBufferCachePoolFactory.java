@@ -25,7 +25,7 @@ public class SimpleByteBufferCachePoolFactory implements ByteBufferCachePoolFact
 
     @Override
     public void refresh(ByteBuffer object) {
-        if (object == null) throw new NullPointerException("ByteBuffer为空");
+        if (object == null) throw new NullPointerException("ByteBuffer can not be null");
 
         object.clear();
         object.order(ByteOrder.BIG_ENDIAN);
@@ -49,11 +49,11 @@ public class SimpleByteBufferCachePoolFactory implements ByteBufferCachePoolFact
     }
 
     private void checkConfig(final CubeConfig cubeConfig) throws ByteBufferCachePoolFactoryInitException {
-        if (cubeConfig == null) throw new ByteBufferCachePoolFactoryInitException("配置不能为空");
+        if (cubeConfig == null) throw new ByteBufferCachePoolFactoryInitException("config can not be null");
 
         Integer bufferSize = cubeConfig.getBufferSize();
-        if (bufferSize == null) throw new ByteBufferCachePoolFactoryInitException("Buffer长度不能为空");
+        if (bufferSize == null) throw new ByteBufferCachePoolFactoryInitException("buffer size can not be null");
         if (bufferSize < 1024 || bufferSize > 1024 * 512)
-            throw new ByteBufferCachePoolFactoryInitException("Buffer长度必须在[22, 102400]之间取值");
+            throw new ByteBufferCachePoolFactoryInitException("buffer size must in range 1024-524288]");
     }
 }

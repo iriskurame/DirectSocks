@@ -13,7 +13,6 @@ public class ServerRoleContext implements CloseableAttachment {
 
     @Override
     public void close() throws IOException {
-
     }
 
     public ServerState getServerState() {

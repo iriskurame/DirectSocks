@@ -42,7 +42,7 @@ public class TestServerLauncher {
         try {
             bindAddress = InetAddress.getByName(bindAddressName);
         } catch (UnknownHostException e) {
-            logger.error("地址解析错误", e);
+            logger.error("resolving host address exception", e);
             return;
         }
         config.setBindAddress(bindAddress);
@@ -66,7 +66,7 @@ public class TestServerLauncher {
             server = new Server(config);
             server.start();
         } catch (ServerInitException e) {
-            logger.error("初始化异常", e);
+            logger.error("start server exception", e);
             return;
         }
 
@@ -84,7 +84,7 @@ public class TestServerLauncher {
 
             server.shutdown();
         } catch (IOException e) {
-            logger.error("IO异常", e);
+            logger.error("IO exception", e);
         }
     }
 }

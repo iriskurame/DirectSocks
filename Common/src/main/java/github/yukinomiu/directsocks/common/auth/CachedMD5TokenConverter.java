@@ -49,8 +49,8 @@ public class CachedMD5TokenConverter implements TokenConverter {
             try {
                 messageDigest = MessageDigest.getInstance("MD5");
             } catch (NoSuchAlgorithmException e) {
-                logger.error("初始化异常", e);
-                throw new TokenConverterRuntimeException("初始化异常", e);
+                logger.error("init exception", e);
+                throw new TokenConverterRuntimeException("init exception", e);
             }
 
             targetLength = messageDigest.getDigestLength();

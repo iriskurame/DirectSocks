@@ -35,7 +35,7 @@ public class ClientContext implements CloseableAttachment {
                 break;
 
             default:
-                throw new ClientRuntimeException("ClientChannelRole不支持");
+                throw new ClientRuntimeException("ClientChannelRole not supported: " + this.clientChannelRole);
         }
     }
 
@@ -47,7 +47,7 @@ public class ClientContext implements CloseableAttachment {
         try {
             currentChannelContext.close();
         } catch (Exception e) {
-            logger.error("关闭ClientContext异常", e);
+            logger.error("closing ClientContext exception", e);
         }
     }
 

@@ -35,7 +35,7 @@ public class ServerContext implements CloseableAttachment {
                 break;
 
             default:
-                throw new ServerRuntimeException("ServerChannelRole不支持");
+                throw new ServerRuntimeException("ServerChannelRole not supported: " + this.serverChannelRole);
         }
     }
 

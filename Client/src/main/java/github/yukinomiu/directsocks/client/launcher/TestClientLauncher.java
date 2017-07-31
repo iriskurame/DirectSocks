@@ -45,7 +45,7 @@ public class TestClientLauncher {
             bindAddress = InetAddress.getByName(bindAddressName);
             serverAddress = InetAddress.getByName(serverAddressName);
         } catch (UnknownHostException e) {
-            logger.error("地址解析错误", e);
+            logger.error("resolving host address exception", e);
             return;
         }
         config.setBindAddress(bindAddress);
@@ -69,7 +69,7 @@ public class TestClientLauncher {
             client = new Client(config);
             client.start();
         } catch (ClientInitException e) {
-            logger.error("初始化异常", e);
+            logger.error("start client exception", e);
             return;
         }
 
@@ -87,7 +87,7 @@ public class TestClientLauncher {
 
             client.shutdown();
         } catch (IOException e) {
-            logger.error("IO异常", e);
+            logger.error("IO exception", e);
         }
     }
 }

@@ -111,7 +111,7 @@ public class CubeContext {
     }
 
     public CubeContext readyConnect(final SocketAddress remoteAddress) throws CubeConnectionException {
-        if (remoteAddress == null) throw new NullPointerException("SocketAddress为空");
+        if (remoteAddress == null) throw new NullPointerException("SocketAddress can not be null");
 
         CubeContext newCubeContext = switcher.registerNewSocketChannel();
         SelectionKey newSelectionKey = newCubeContext.selectionKey;
@@ -122,7 +122,7 @@ public class CubeContext {
             newSocketChannel.connect(remoteAddress);
         } catch (Exception e) {
             newCubeContext.cancel();
-            throw new CubeConnectionException("连接异常", e);
+            throw new CubeConnectionException("connection exception", e);
         }
 
         return newCubeContext;
@@ -147,7 +147,7 @@ public class CubeContext {
         try {
             socketChannel.close();
         } catch (IOException e) {
-            logger.error("关闭SocketChannel IO异常", e);
+            logger.error("closing SocketChannel IO exception", e);
         }
 
         if (readBuffer != null) {
@@ -164,7 +164,7 @@ public class CubeContext {
             try {
                 attachment.close();
             } catch (Exception e) {
-                logger.error("关闭Attachment异常", e);
+                logger.error("closing attachment exception", e);
             }
         }
     }
@@ -178,7 +178,7 @@ public class CubeContext {
     }
 
     public void contextReadAfterWrite(final CubeContext cubeContext) {
-        if (cubeContext == null) throw new NullPointerException("CubeContext为空");
+        if (cubeContext == null) throw new NullPointerException("CubeContext can not be null");
 
         contextReadAfterWriteFlag = true;
         context = cubeContext;

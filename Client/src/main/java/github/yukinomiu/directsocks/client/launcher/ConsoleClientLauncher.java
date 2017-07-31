@@ -23,38 +23,38 @@ public class ConsoleClientLauncher {
     private static final Logger logger = LoggerFactory.getLogger(ConsoleClientLauncher.class);
 
     public static void main(String[] args) {
-        // get config file path
+        // get client config file path
         if (args == null || args.length == 0) {
-            logger.error("参数错误");
+            logger.error("bad argument");
             return;
         }
 
         // load config
-        logger.info("加载配置文件开始");
+        logger.info("start loading client config file");
         final String configFilePath = args[0];
         final ClientConfig clientConfig;
         try {
             clientConfig = loadClientConfig(configFilePath);
         } catch (DirectSocksConfigException e) {
-            logger.error("加载配置文件错误: {}", e.getMessage());
+            logger.error("loading client config file exception: {}", e.getMessage());
             return;
         }
-        logger.info("加载配置文件成功");
+        logger.info("loading client config file done");
 
         // start client
-        logger.info("启动客户端开始");
+        logger.info("start client");
         Client client;
         try {
             client = new Client(clientConfig);
             client.start();
         } catch (ClientInitException e) {
-            logger.error("启动客户端错误", e);
+            logger.error("start client exception: {}", e.getMessage());
             return;
         }
-        logger.info("启动客户端成功");
+        logger.info("start client done");
 
         // wait command
-        logger.info("请输入命令, 按回车键提交\r\n");
+        logger.info("please enter command and press 'Enter' to submit\r\n");
         try (InputStreamReader inputStreamReader = new InputStreamReader(System.in);
              BufferedReader bufferedReader = new BufferedReader(inputStreamReader)) {
 
@@ -64,24 +64,24 @@ public class ConsoleClientLauncher {
                     break;
                 }
 
-                logger.info("未知命令: {}", line);
+                logger.info("unknown command '{}'", line);
             }
 
             client.shutdown();
-            logger.info("客户端关闭成功");
+            logger.info("client closed");
         } catch (IOException e) {
-            logger.error("IO异常", e);
+            logger.error("IO exception: {}", e.getMessage());
         }
     }
 
     private static ClientConfig loadClientConfig(String configFilePath) {
-        // load config file
+        // load client config file
         File file = new File(configFilePath);
         if (!file.exists()) {
-            throw new DirectSocksConfigException("客户端配置文件不存在");
+            throw new DirectSocksConfigException("client config file not exists");
         }
         if (file.isDirectory()) {
-            throw new DirectSocksConfigException("客户端配置文件不能是文件夹");
+            throw new DirectSocksConfigException("client config file can not be directory");
         }
 
         Properties properties;
@@ -89,9 +89,9 @@ public class ConsoleClientLauncher {
             properties = new Properties();
             properties.load(ins);
         } catch (FileNotFoundException e) {
-            throw new DirectSocksConfigException("客户端配置文件不存在");
+            throw new DirectSocksConfigException("client config file not exists");
         } catch (IOException e) {
-            throw new DirectSocksConfigException("加载客户端配置文件时IO错误", e);
+            throw new DirectSocksConfigException("loading client config file IO exception", e);
         }
 
         // get param
@@ -133,7 +133,7 @@ public class ConsoleClientLauncher {
             bindAddress = InetAddress.getByName(bindAddressName);
             serverAddress = InetAddress.getByName(serverAddressName);
         } catch (UnknownHostException e) {
-            throw new DirectSocksConfigException("地址解析错误", e);
+            throw new DirectSocksConfigException("resolving host address exception");
         }
         config.setBindAddress(bindAddress);
         config.setBindPort(bindPort);

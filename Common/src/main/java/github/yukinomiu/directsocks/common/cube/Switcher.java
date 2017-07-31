@@ -51,8 +51,8 @@ public class Switcher implements LifeCycle {
             // init selector
             switchSelector = Selector.open();
         } catch (IOException e) {
-            logger.error("Switcher IO异常", e);
-            throw new SwitcherInitException("Switcher IO异常", e);
+            logger.error("init Switcher IO exception", e);
+            throw new SwitcherInitException("Switcher IO exception", e);
         }
     }
 
@@ -64,7 +64,7 @@ public class Switcher implements LifeCycle {
         startSwitcher();
 
         state = State.RUNNING;
-        logger.debug("Switcher成功启动");
+        logger.debug("Switcher started");
     }
 
     @Override
@@ -76,12 +76,12 @@ public class Switcher implements LifeCycle {
         logger.debug("{}: acceptCount={}", this, acceptCount);
 
         state = State.STOPPED;
-        logger.debug("Switcher成功关闭");
+        logger.debug("Switcher closed");
     }
 
     private void startSwitcher() {
         switchThread = new Thread(() -> {
-            logger.debug("开始等待Switcher IO事件");
+            logger.debug("start waiting switcher IO events");
 
             CubeContext cubeContext = null;
             while (true) {
@@ -130,23 +130,23 @@ public class Switcher implements LifeCycle {
                     }
 
                 } catch (ClosedSelectorException e) {
-                    logger.error("SwitchSelector意外关闭");
+                    logger.error("SwitchSelector is closed");
                     break;
 
                 } catch (IOException e) {
-                    logger.error("Switcher IO异常", e);
+                    logger.error("Switcher IO exception", e);
                     if (cubeContext != null) {
                         cubeContext.cancel();
                     }
 
                 } catch (CancelledKeyException e) {
-                    logger.debug("连接被关闭");
+                    logger.debug("connection is closed");
                     if (cubeContext != null) {
                         cubeContext.cancel();
                     }
 
                 } catch (Exception e) {
-                    logger.error("Switcher异常", e);
+                    logger.error("Switcher exception", e);
                     if (cubeContext != null) {
                         cubeContext.cancel();
                     }
@@ -154,7 +154,7 @@ public class Switcher implements LifeCycle {
                 }
             }
 
-            logger.debug("结束等待Switcher IO事件");
+            logger.debug("start waiting switcher IO events");
         });
 
         switchThread.setName("switcher thread");
@@ -177,19 +177,19 @@ public class Switcher implements LifeCycle {
         try {
             n = socketChannel.read(readBuffer);
         } catch (IOException e) {
-            logger.error("NioHandle处理读取流程异常, 关闭连接", e.getMessage());
+            logger.error("read exception: {}, connection will be closed", e.getMessage());
             cubeContext.cancel();
             return;
         }
 
         if (n == -1) {
-            logger.debug("远端已关闭连接, 关闭连接");
+            logger.debug("end of stream, connection will be closed");
             cubeContext.cancel();
             return;
         }
 
         if (n == 0) {
-            logger.warn("读取长度为0");
+            logger.warn("can not read any data from connection");
             return;
         }
 
@@ -197,10 +197,10 @@ public class Switcher implements LifeCycle {
         try {
             nioHandle.handleRead(cubeContext);
         } catch (CancelledKeyException e) {
-            logger.debug("连接被关闭");
+            logger.debug("connection is closed");
             cubeContext.cancel();
         } catch (Exception e) {
-            logger.error("NioHandle处理读取流程异常, 关闭连接", e);
+            logger.error("NioHandle read exception: {}, connection will be closed", e.getMessage());
             cubeContext.cancel();
         }
 
@@ -215,7 +215,7 @@ public class Switcher implements LifeCycle {
         try {
             socketChannel.write(writeBuffer);
         } catch (IOException e) {
-            logger.error("NioHandle处理写入流程异常, 关闭连接", e.getMessage());
+            logger.error("write exception: {}, connection will be closed", e.getMessage());
             cubeContext.cancel();
             return;
         }
@@ -229,7 +229,7 @@ public class Switcher implements LifeCycle {
             try {
                 cubeContext.readyRead();
             } catch (CancelledKeyException e) {
-                logger.debug("连接被关闭");
+                logger.debug("connection is closed");
                 cubeContext.cancel();
                 return;
             }
@@ -239,7 +239,7 @@ public class Switcher implements LifeCycle {
             try {
                 cubeContext.finishContextReadAfterWrite();
             } catch (CancelledKeyException e) {
-                logger.debug("连接被关闭");
+                logger.debug("connection is closed");
                 cubeContext.cancel();
                 return;
             }
@@ -248,7 +248,7 @@ public class Switcher implements LifeCycle {
         try {
             cubeContext.finishWrite();
         } catch (CancelledKeyException e) {
-            logger.debug("连接被关闭");
+            logger.debug("connection is closed");
             cubeContext.cancel();
         }
     }
@@ -258,13 +258,13 @@ public class Switcher implements LifeCycle {
 
         try {
             boolean connected = socketChannel.finishConnect();
-            if (!connected) throw new RuntimeException("连接未知异常");
+            if (!connected) throw new RuntimeException("connection unknown exception");
 
             // connection success
             try {
                 nioHandle.handleConnectedSuccess(cubeContext);
             } catch (Exception e) {
-                logger.error("NioHandle处理连接成功流程异常, 关闭连接", e);
+                logger.error("NioHandle connection success exception: {}, connection will be closed", e.getMessage());
                 cubeContext.cancel();
             }
         } catch (IOException ioe) {
@@ -272,14 +272,14 @@ public class Switcher implements LifeCycle {
             if (logger.isWarnEnabled()) {
                 String remoteAddressString = cubeContext.getRemoteAddress().getHostAddress();
                 String remoteIPString = String.valueOf(cubeContext.getRemotePort());
-                logger.warn("连接远程主机 {}:{} 异常", remoteAddressString, remoteIPString);
+                logger.warn("connect remote host {}:{} exception", remoteAddressString, remoteIPString);
             }
 
-            CubeConnectionException cubeConnectionException = new CubeConnectionException("连接异常", ioe);
+            CubeConnectionException cubeConnectionException = new CubeConnectionException("connection exception", ioe);
             try {
                 nioHandle.handleConnectedFail(cubeContext, cubeConnectionException);
             } catch (Exception e) {
-                logger.error("NioHandle处理连接失败流程异常, 关闭连接", e);
+                logger.error("NioHandle connection fail exception: {}, connection will be closed", e.getMessage());
                 cubeContext.cancel();
                 return;
             }
@@ -303,10 +303,10 @@ public class Switcher implements LifeCycle {
             configSocketChannel(socketChannel);
         } catch (IOException e) {
             try {
-                logger.warn("配置SocketChannel异常, 关闭连接", e);
+                logger.warn("config SocketChannel exception, connection will be closed", e);
                 socketChannel.close();
             } catch (IOException ioe) {
-                logger.error("关闭连接异常", ioe);
+                logger.error("closing connection IO exception", ioe);
             }
 
             return;
@@ -323,14 +323,14 @@ public class Switcher implements LifeCycle {
 
             cubeContext.readyRead(); // default ready read
         } catch (ClosedChannelException e) {
-            logger.debug("连接被关闭", e);
+            logger.debug("connection is closed", e);
         } catch (CancelledKeyException e) {
-            logger.warn("通道意外取消");
+            logger.warn("channel is canceled");
             if (cubeContext != null) {
                 cubeContext.cancel();
             }
         } catch (ClosedSelectorException e) {
-            logger.warn("SwitcherSelector已经关闭", e);
+            logger.warn("SwitcherSelector already closed", e);
         } finally {
             lock.unlock();
         }
@@ -346,17 +346,17 @@ public class Switcher implements LifeCycle {
             selectionKey.attach(cubeContext);
             return cubeContext;
         } catch (IOException e) {
-            throw new CubeRuntimeException("配置SocketChannel异常", e);
+            throw new CubeRuntimeException("config SocketChannel exception", e);
         }
     }
 
     private void checkConfig(final CubeConfig cubeConfig) throws SwitcherInitException {
-        if (cubeConfig == null) throw new SwitcherInitException("配置不能为空");
+        if (cubeConfig == null) throw new SwitcherInitException("config can not be null");
 
         Boolean tcpNoDelay = cubeConfig.getTcpNoDelay();
-        if (tcpNoDelay == null) throw new SwitcherInitException("TcpNoDelay不能为空");
+        if (tcpNoDelay == null) throw new SwitcherInitException("TcpNoDelay can not be null");
 
         Boolean tcpKeepAlive = cubeConfig.getTcpKeepAlive();
-        if (tcpKeepAlive == null) throw new SwitcherInitException("TcpKeepAlive不能为空");
+        if (tcpKeepAlive == null) throw new SwitcherInitException("TcpKeepAlive can not be null");
     }
 }

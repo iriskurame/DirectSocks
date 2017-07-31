@@ -14,31 +14,34 @@ public class PropertiesUtil {
 
     public static String getString(final Properties properties, final String name) {
         String value = properties.getProperty(name);
-        if (value == null || value.length() == 0) throw new DirectSocksConfigException("配置项为空: " + name);
+        if (value == null || value.length() == 0)
+            throw new DirectSocksConfigException("config item can not be null: " + name);
         return value;
     }
 
     public static int getInt(final Properties properties, final String name) {
         String value = properties.getProperty(name);
-        if (value == null || value.length() == 0) throw new DirectSocksConfigException("配置项为空: " + name);
+        if (value == null || value.length() == 0)
+            throw new DirectSocksConfigException("config item can not be null: " + name);
 
         try {
             return Integer.valueOf(value);
         } catch (NumberFormatException e) {
-            throw new DirectSocksConfigException("配置项必须为数字: " + name);
+            throw new DirectSocksConfigException("config item must be int number: " + name);
         }
     }
 
     public static boolean getBoolean(final Properties properties, final String name) {
         String value = properties.getProperty(name);
-        if (value == null || value.length() == 0) throw new DirectSocksConfigException("配置项为空: " + name);
+        if (value == null || value.length() == 0)
+            throw new DirectSocksConfigException("config item can not be null: " + name);
 
         if ("true".equals(value.toLowerCase())) {
             return true;
         } else if ("false".equals(value.toLowerCase())) {
             return false;
         } else {
-            throw new DirectSocksConfigException("配置项必须为布尔值: " + name);
+            throw new DirectSocksConfigException("config item must be boolean: " + name);
         }
     }
 }

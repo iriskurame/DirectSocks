@@ -46,7 +46,7 @@ public class Docker implements LifeCycle {
         startDocker();
 
         state = State.RUNNING;
-        logger.debug("Docker成功开启");
+        logger.debug("Docker started");
     }
 
     @Override
@@ -57,15 +57,15 @@ public class Docker implements LifeCycle {
         shutdownDocker();
 
         state = State.STOPPED;
-        logger.debug("Docker成功关闭");
+        logger.debug("Docker closed");
     }
 
     private void checkConfig(final CubeConfig cubeConfig) throws DokerInitException {
-        if (cubeConfig == null) throw new DokerInitException("配置不能为空");
+        if (cubeConfig == null) throw new DokerInitException("config can not be null");
 
         Integer workerCount = cubeConfig.getWorkerCount();
-        if (workerCount == null) throw new DokerInitException("worker数量不能为空");
-        if (workerCount < 1 || workerCount > 16) throw new DokerInitException("worker数量必须在[1, 16]之间取值");
+        if (workerCount == null) throw new DokerInitException("worker count can not be null");
+        if (workerCount < 1 || workerCount > 16) throw new DokerInitException("worker count must in range 1-16");
     }
 
     private void startDocker() {
@@ -75,7 +75,7 @@ public class Docker implements LifeCycle {
             try {
                 switcher.start();
             } catch (Exception e) {
-                logger.error("Switcher启动失败");
+                logger.error("starting Switcher exception");
             }
         }
     }
@@ -85,7 +85,7 @@ public class Docker implements LifeCycle {
             try {
                 switcher.shutdown();
             } catch (Exception e) {
-                logger.error("Switcher启动失败");
+                logger.error("closing Switcher exception");
             }
         }
 

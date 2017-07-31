@@ -19,7 +19,6 @@ public class LocalRoleContext implements CloseableAttachment {
 
     @Override
     public void close() throws IOException {
-
     }
 
     public LocalState getLocalState() {

@@ -25,65 +25,105 @@ public class ConsoleServerLauncher {
     private static final Logger logger = LoggerFactory.getLogger(ConsoleServerLauncher.class);
 
     public static void main(String[] args) {
-        // get config file path
+        // get server config file path
         if (args == null || args.length == 0) {
-            logger.error("参数错误");
+            logger.error("bad argument");
             return;
         }
 
         // load config
-        logger.info("加载配置文件开始");
+        logger.info("start loading server config file");
         final String configFilePath = args[0];
         final ServerConfig serverConfig;
         try {
             serverConfig = loadServerConfig(configFilePath);
         } catch (DirectSocksConfigException e) {
-            logger.error("加载配置文件错误: {}", e.getMessage());
+            logger.error("loading server config file exception: {}", e.getMessage());
             return;
         }
-        logger.info("加载配置文件成功");
+        logger.info("loading server config file done");
 
         // start client
-        logger.info("启动服务端开始");
+        logger.info("start server");
         Server server;
         try {
             server = new Server(serverConfig);
             server.start();
         } catch (ServerInitException e) {
-            logger.error("启动服务端错误", e);
+            logger.error("start server exception: {}", e.getMessage());
             return;
         }
-        logger.info("启动服务端成功");
+        logger.info("start server done");
 
         // wait command
-        logger.info("请输入命令, 按回车键提交\r\n");
+        logger.info("please enter command and press 'Enter' to submit\r\n");
         try (InputStreamReader inputStreamReader = new InputStreamReader(System.in);
              BufferedReader bufferedReader = new BufferedReader(inputStreamReader)) {
 
             String line;
+            TokenChecker tokenChecker = serverConfig.getTokenChecker();
+            label:
             while ((line = bufferedReader.readLine()) != null) {
-                if (line.equals("q")) {
-                    break;
-                }
+                logger.info("process command '{}'", line);
 
-                logger.info("未知命令: {}", line);
+                String[] commands = line.split("\\s");
+                String command = commands[0];
+
+                switch (command) {
+                    case "q":
+                        logger.info("server will quit");
+                        break label;
+
+                    case "add":
+                        if (commands.length > 1) {
+                            for (int i = 1; i < commands.length; i++) {
+                                String key = commands[i];
+                                tokenChecker.add(key);
+                                logger.info("add key '{}'", key);
+                            }
+                        }
+                        break;
+
+                    case "remove":
+                        if (commands.length > 1) {
+                            for (int i = 1; i < commands.length; i++) {
+                                String key = commands[i];
+                                boolean isRemoved = tokenChecker.remove(key);
+                                if (isRemoved) {
+                                    logger.info("key '{}' removed", key);
+                                } else {
+                                    logger.info("key '{}' not exists", key);
+                                }
+                            }
+                        }
+                        break;
+
+                    case "list":
+                        for (String key : tokenChecker.listKeys()) {
+                            logger.info("'{}'", key);
+                        }
+                        break;
+
+                    default:
+                        logger.info("unknown command '{}'", line);
+                }
             }
 
             server.shutdown();
-            logger.info("服务端关闭成功");
+            logger.info("server closed");
         } catch (IOException e) {
-            logger.error("IO异常", e);
+            logger.error("IO exception: {}", e.getMessage());
         }
     }
 
     private static ServerConfig loadServerConfig(String configFilePath) {
-        // load config file
+        // load server config file
         File file = new File(configFilePath);
         if (!file.exists()) {
-            throw new DirectSocksConfigException("服务端配置文件不存在");
+            throw new DirectSocksConfigException("server config file not exists");
         }
         if (file.isDirectory()) {
-            throw new DirectSocksConfigException("服务端配置文件不能是文件夹");
+            throw new DirectSocksConfigException("server config file can not be directory");
         }
 
         Properties properties;
@@ -91,9 +131,9 @@ public class ConsoleServerLauncher {
             properties = new Properties();
             properties.load(ins);
         } catch (FileNotFoundException e) {
-            throw new DirectSocksConfigException("服务端配置文件不存在");
+            throw new DirectSocksConfigException("server config file not exists");
         } catch (IOException e) {
-            throw new DirectSocksConfigException("加载服务端配置文件时IO错误", e);
+            throw new DirectSocksConfigException("loading server config file IO exception", e);
         }
 
         // get param
@@ -129,7 +169,7 @@ public class ConsoleServerLauncher {
         try {
             bindAddress = InetAddress.getByName(bindAddressName);
         } catch (UnknownHostException e) {
-            throw new DirectSocksConfigException("地址解析错误", e);
+            throw new DirectSocksConfigException("resolving host address exception", e);
         }
         config.setBindAddress(bindAddress);
         config.setBindPort(bindPort);

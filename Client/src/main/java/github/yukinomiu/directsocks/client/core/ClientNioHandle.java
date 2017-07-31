@@ -55,13 +55,13 @@ public class ClientNioHandle implements NioHandle {
                 break;
 
             default:
-                throw new ClientRuntimeException(currentRole.name() + "角色不支持");
+                throw new ClientRuntimeException("ClientChannelRole not supported: " + currentRole);
         }
     }
 
     private void handleLocalRead(final CubeContext cubeContext, final ClientContext clientContext) {
         final LocalRoleContext localRoleContext = (LocalRoleContext) clientContext.getCurrentChannelContext();
-        LocalState currentState = localRoleContext.getLocalState();
+        final LocalState currentState = localRoleContext.getLocalState();
         switch (currentState) {
             case SOCKS_AUTH:
                 handleLocalSocksAuthRead(cubeContext, clientContext, localRoleContext);
@@ -76,13 +76,13 @@ public class ClientNioHandle implements NioHandle {
                 break;
 
             default:
-                throw new ClientRuntimeException(currentState.name() + " 状态不支持");
+                throw new ClientRuntimeException("LocalState not supported: " + currentState);
         }
     }
 
     private void handleServerRead(final CubeContext cubeContext, final ClientContext clientContext) {
         final ServerRoleContext serverRoleContext = (ServerRoleContext) clientContext.getCurrentChannelContext();
-        ServerState currentState = serverRoleContext.getServerState();
+        final ServerState currentState = serverRoleContext.getServerState();
         switch (currentState) {
             case DIRECT_SOCKS:
                 handleServerDirectSocksRead(cubeContext, clientContext, serverRoleContext);
@@ -93,7 +93,7 @@ public class ClientNioHandle implements NioHandle {
                 break;
 
             default:
-                throw new ClientRuntimeException(currentState.name() + " 状态不支持");
+                throw new ClientRuntimeException("ServerState not supported: " + currentState);
         }
     }
 
@@ -105,19 +105,19 @@ public class ClientNioHandle implements NioHandle {
         final ByteBuffer readBuffer = cubeContext.getReadBuffer();
 
         if (readBuffer.remaining() < 3) {
-            logger.warn("SOCKS协议错误");
+            logger.warn("SOCKS error");
             cubeContext.cancel();
             return;
         }
 
         if (readBuffer.get() != SocksVersion.VERSION_5) {
-            logger.warn("SOCKS版本 {} 不支持, 断开连接", readBuffer.get(0));
+            logger.warn("SOCKS version {} not supported", readBuffer.get(0));
             cubeContext.cancel();
             return;
         }
 
         if (readBuffer.get() != readBuffer.remaining()) {
-            logger.warn("SOCKS协议错误");
+            logger.warn("SOCKS error");
             cubeContext.cancel();
             return;
         }
@@ -139,7 +139,7 @@ public class ClientNioHandle implements NioHandle {
 
         // check context
         if (localRoleContext.getAuthMethod() == SocksAuthMethod.NO_ACCEPTABLE_METHODS) {
-            logger.warn("SOCKS验证协议不支持, 断开连接");
+            logger.warn("SOCKS auth method not supported");
 
             final ByteBuffer writeBuffer = cubeContext.readyWrite();
             writeBuffer.put(SocksVersion.VERSION_5);
@@ -166,13 +166,13 @@ public class ClientNioHandle implements NioHandle {
         final ByteBuffer readBuffer = cubeContext.getReadBuffer();
 
         if (readBuffer.remaining() < 4) {
-            logger.warn("SOCKS协议错误");
+            logger.warn("SOCKS error");
             cubeContext.cancel();
             return;
         }
 
         if (readBuffer.get() != SocksVersion.VERSION_5) {
-            logger.warn("SOCKS版本 {} 不支持, 断开连接", readBuffer.get(0));
+            logger.warn("SOCKS version {} not supported", readBuffer.get(0));
             cubeContext.cancel();
             return;
         }
@@ -183,13 +183,13 @@ public class ClientNioHandle implements NioHandle {
                 && command != SocksCommand.BIND
                 && command != SocksCommand.UDP_ASSOCIATE) {
 
-            logger.warn("SOCKS协议错误");
+            logger.warn("SOCKS error");
             cubeContext.cancel();
             return;
         }
 
         if (readBuffer.get() != SocksReserved.RESERVED) {
-            logger.warn("SOCKS协议错误");
+            logger.warn("SOCKS error");
             cubeContext.cancel();
             return;
         }
@@ -200,7 +200,7 @@ public class ClientNioHandle implements NioHandle {
 
         if (addressType == SocksAddressType.IPV4) {
             if (readBuffer.remaining() != 6) {
-                logger.warn("SOCKS协议错误");
+                logger.warn("SOCKS error");
                 cubeContext.cancel();
                 return;
             }
@@ -212,7 +212,7 @@ public class ClientNioHandle implements NioHandle {
 
         } else if (addressType == SocksAddressType.DOMAIN_NAME) {
             if (readBuffer.remaining() < 1) {
-                logger.warn("SOCKS协议错误");
+                logger.warn("SOCKS error");
                 cubeContext.cancel();
                 return;
             }
@@ -220,7 +220,7 @@ public class ClientNioHandle implements NioHandle {
             int domainNameLength = readBuffer.get();
 
             if (readBuffer.remaining() != domainNameLength + 2) {
-                logger.warn("SOCKS协议错误");
+                logger.warn("SOCKS error");
                 cubeContext.cancel();
                 return;
             }
@@ -232,7 +232,7 @@ public class ClientNioHandle implements NioHandle {
 
         } else if (addressType == SocksAddressType.IPV6) {
             if (readBuffer.remaining() != 18) {
-                logger.warn("SOCKS协议错误");
+                logger.warn("SOCKS error");
                 cubeContext.cancel();
                 return;
             }
@@ -243,7 +243,7 @@ public class ClientNioHandle implements NioHandle {
             readBuffer.get(port, 0, 2);
 
         } else {
-            logger.warn("SOCKS协议错误");
+            logger.warn("SOCKS error");
             cubeContext.cancel();
             return;
         }
@@ -263,10 +263,10 @@ public class ClientNioHandle implements NioHandle {
                     address = targetAddress.getAddress();
 
                 } else {
-                    throw new ClientRuntimeException("本地解析地址类型不支持");
+                    throw new ClientRuntimeException("address type not supported");
                 }
             } catch (UnknownHostException e) {
-                logger.warn("域名 {} 本地解析失败", targetHost);
+                logger.warn("resolving host name fail: {}", targetHost);
             }
         }
 
@@ -277,7 +277,7 @@ public class ClientNioHandle implements NioHandle {
 
         // check context
         if (localRoleContext.getCommand() != SocksCommand.CONNECT) {
-            logger.warn("命令 {} 不支持, 断开连接", localRoleContext.getCommand());
+            logger.warn("command {} not supported", localRoleContext.getCommand());
 
             final ByteBuffer writeBuffer = cubeContext.readyWrite();
             writeBuffer.put(SocksVersion.VERSION_5);
@@ -303,7 +303,7 @@ public class ClientNioHandle implements NioHandle {
             clientContext.setAssociatedCubeContext(serverCubeContext);
             serverClientContext.setAssociatedCubeContext(cubeContext);
         } catch (CubeConnectionException e) {
-            logger.warn("连接服务端异常", e);
+            logger.warn("connect to server exception", e);
 
             final ByteBuffer writeBuffer = cubeContext.readyWrite();
             writeBuffer.put(SocksVersion.VERSION_5);
@@ -350,13 +350,13 @@ public class ClientNioHandle implements NioHandle {
         final ByteBuffer readBuffer = cubeContext.getReadBuffer();
 
         if (readBuffer.remaining() < 2) {
-            logger.warn("DS协议错误");
+            logger.warn("DS error");
             cancelAndReply(cubeContext, localCubeContext, SocksReply.GENERAL_SERVER_FAILURE);
             return;
         }
 
         if (readBuffer.get() != DirectSocksVersion.VERSION_1) {
-            logger.warn("DS版本 {} 不支持", readBuffer.get(0));
+            logger.warn("DS version {} not supported", readBuffer.get(0));
             cancelAndReply(cubeContext, localCubeContext, SocksReply.GENERAL_SERVER_FAILURE);
             return;
         }
@@ -366,7 +366,7 @@ public class ClientNioHandle implements NioHandle {
             case DirectSocksReply.SUCCESS: {
 
                 if (readBuffer.remaining() < 1) {
-                    logger.warn("DS协议错误");
+                    logger.warn("DS exception");
                     cancelAndReply(cubeContext, localCubeContext, SocksReply.GENERAL_SERVER_FAILURE);
                     return;
                 }
@@ -378,7 +378,7 @@ public class ClientNioHandle implements NioHandle {
 
                 if (addressType == DirectSocksAddressType.IPV4) {
                     if (readBuffer.remaining() != 6) {
-                        logger.warn("DS协议错误");
+                        logger.warn("DS error");
                         cancelAndReply(cubeContext, localCubeContext, SocksReply.GENERAL_SERVER_FAILURE);
                         return;
                     }
@@ -391,7 +391,7 @@ public class ClientNioHandle implements NioHandle {
 
                 } else if (addressType == DirectSocksAddressType.DOMAIN_NAME) {
                     if (readBuffer.remaining() < 1) {
-                        logger.warn("DS协议错误");
+                        logger.warn("DS error");
                         cancelAndReply(cubeContext, localCubeContext, SocksReply.GENERAL_SERVER_FAILURE);
                         return;
                     }
@@ -400,7 +400,7 @@ public class ClientNioHandle implements NioHandle {
                     int domainNameLength = readBuffer.get();
 
                     if (readBuffer.remaining() != domainNameLength + 2) {
-                        logger.warn("DS协议错误");
+                        logger.warn("DS error");
                         cancelAndReply(cubeContext, localCubeContext, SocksReply.GENERAL_SERVER_FAILURE);
                         return;
                     }
@@ -412,7 +412,7 @@ public class ClientNioHandle implements NioHandle {
 
                 } else if (addressType == DirectSocksAddressType.IPV6) {
                     if (readBuffer.remaining() != 18) {
-                        logger.warn("DS协议错误");
+                        logger.warn("DS error");
                         cancelAndReply(cubeContext, localCubeContext, SocksReply.GENERAL_SERVER_FAILURE);
                         return;
                     }
@@ -424,7 +424,7 @@ public class ClientNioHandle implements NioHandle {
                     readBuffer.get(port, 0, 2);
 
                 } else {
-                    logger.warn("DS地址类型 {} 不支持", addressType);
+                    logger.warn("DS address type {} not supported", addressType);
                     cancelAndReply(cubeContext, localCubeContext, SocksReply.GENERAL_SERVER_FAILURE);
                     return;
                 }
@@ -448,37 +448,37 @@ public class ClientNioHandle implements NioHandle {
             }
 
             case DirectSocksReply.AUTH_FAIL: {
-                logger.warn("服务端认证失败");
+                logger.warn("server auth fail");
                 cancelAndReply(cubeContext, localCubeContext, SocksReply.CONNECTION_NOT_ALLOWED);
                 return;
             }
 
             case DirectSocksReply.CONNECTION_TYPE_NOT_SUPPORTED: {
-                logger.warn("服务端连接类型不支持");
+                logger.warn("server connection type not supported");
                 cancelAndReply(cubeContext, localCubeContext, SocksReply.COMMAND_NOT_SUPPORTED);
                 return;
             }
 
             case DirectSocksReply.NETWORK_UNREACHABLE: {
-                logger.warn("服务端网络不可达");
+                logger.warn("server network unreachable");
                 cancelAndReply(cubeContext, localCubeContext, SocksReply.NETWORK_UNREACHABLE);
                 return;
             }
 
             case DirectSocksReply.HOST_UNREACHABLE: {
-                logger.warn("服务端主机不可达");
+                logger.warn("server host unreachable");
                 cancelAndReply(cubeContext, localCubeContext, SocksReply.HOST_UNREACHABLE);
                 return;
             }
 
             case DirectSocksReply.GENERAL_FAIL: {
-                logger.warn("服务端错误");
+                logger.warn("server exception");
                 cancelAndReply(cubeContext, localCubeContext, SocksReply.GENERAL_SERVER_FAILURE);
                 return;
             }
 
             default: {
-                logger.warn("服务端回复状态 {} 不支持", serverReply);
+                logger.warn("server reply status {} not supported", serverReply);
                 cancelAndReply(cubeContext, localCubeContext, SocksReply.GENERAL_SERVER_FAILURE);
             }
         }
@@ -500,7 +500,7 @@ public class ClientNioHandle implements NioHandle {
         if (localRoleContext.getCommand() == SocksCommand.CONNECT) {
             connectionType = DirectSocksConnectionType.TCP;
         } else {
-            logger.warn("命令 {} 不支持, 断开连接", localRoleContext.getCommand());
+            logger.warn("SOCKS command {} not supported", localRoleContext.getCommand());
             cubeContext.cancel();
 
             final ByteBuffer writeBuffer = localCubeContext.readyWrite();
@@ -519,7 +519,7 @@ public class ClientNioHandle implements NioHandle {
         } else if (localRoleContext.getAddressType() == SocksAddressType.IPV6) {
             addressType = DirectSocksAddressType.IPV6;
         } else {
-            logger.warn("地址类型 {} 不支持, 断开连接", localRoleContext.getAddressType());
+            logger.warn("SOCKS address type {} not supported", localRoleContext.getAddressType());
             cubeContext.cancel();
 
             final ByteBuffer writeBuffer = localCubeContext.readyWrite();
@@ -549,7 +549,7 @@ public class ClientNioHandle implements NioHandle {
 
     @Override
     public void handleConnectedFail(CubeContext cubeContext, CubeConnectionException cubeConnectionException) {
-        logger.warn("连接服务端异常", cubeConnectionException.getMessage());
+        logger.warn("connect to server exception: {}", cubeConnectionException.getMessage());
         cubeContext.cancel();
 
         ClientContext serverClientContext = (ClientContext) cubeContext.attachment();
@@ -571,24 +571,24 @@ public class ClientNioHandle implements NioHandle {
     }
 
     private void checkConfig(final ClientConfig clientConfig) throws ClientInitException {
-        if (clientConfig == null) throw new ClientInitException("配置不能为空");
+        if (clientConfig == null) throw new ClientInitException("config can not be null");
 
         Boolean localDnsResolve = clientConfig.getLocalDnsResolve();
-        if (localDnsResolve == null) throw new ClientInitException("DNS本地解析配置不能为空");
+        if (localDnsResolve == null) throw new ClientInitException("LocalDnsResolve can not be null");
 
         InetAddress serverAddress = clientConfig.getServerAddress();
-        if (serverAddress == null) throw new ClientInitException("服务端地址不能为空");
+        if (serverAddress == null) throw new ClientInitException("ServerAddress can not be null");
         if (!(serverAddress instanceof Inet4Address) && !(serverAddress instanceof Inet6Address))
-            throw new ClientInitException("服务端地址类型不支持, 仅支持 IPv4 和 IPv6 地址");
+            throw new ClientInitException("ServerAddress type not supported");
 
         Integer serverPort = clientConfig.getServerPort();
-        if (serverPort == null) throw new ClientInitException("服务端端口不能为空");
-        if (serverPort < 1 || serverPort > 65535) throw new ClientInitException("服务端端口非法, 端口必须在[1, 65535]之间取值");
+        if (serverPort == null) throw new ClientInitException("ServerPort can not be null");
+        if (serverPort < 1 || serverPort > 65535) throw new ClientInitException("ServerPort must in range 1-65535");
 
         TokenConverter tokenConverter = clientConfig.getTokenConverter();
-        if (tokenConverter == null) throw new ClientInitException("TokenConverter不能为空");
+        if (tokenConverter == null) throw new ClientInitException("TokenConverter can not be null");
 
         String key = clientConfig.getKey();
-        if (key == null) throw new ClientInitException("密钥不能为空");
+        if (key == null) throw new ClientInitException("Key can not be null");
     }
 }

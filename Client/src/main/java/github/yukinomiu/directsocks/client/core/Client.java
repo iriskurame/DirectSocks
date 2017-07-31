@@ -28,8 +28,8 @@ public class Client implements LifeCycle {
         try {
             cube = new Cube(clientConfig, clientNioHandle);
         } catch (CubeInitException e) {
-            logger.error("初始化客户端异常", e);
-            throw new ClientInitException("初始化客户端异常", e);
+            logger.error("init Client exception", e);
+            throw new ClientInitException("init Client exception", e);
         }
     }
 
@@ -41,7 +41,7 @@ public class Client implements LifeCycle {
         cube.start();
 
         state = State.RUNNING;
-        logger.debug("Client成功启动");
+        logger.debug("Client started");
     }
 
     @Override
@@ -52,10 +52,10 @@ public class Client implements LifeCycle {
         cube.shutdown();
 
         state = State.STOPPED;
-        logger.debug("Client成功关闭");
+        logger.debug("Client closed");
     }
 
     private void checkConfig(final ClientConfig clientConfig) throws ClientInitException {
-        if (clientConfig == null) throw new ClientInitException("配置为空");
+        if (clientConfig == null) throw new ClientInitException("config can not be null");
     }
 }

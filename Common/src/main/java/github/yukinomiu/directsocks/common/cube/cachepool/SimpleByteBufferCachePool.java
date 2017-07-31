@@ -48,7 +48,7 @@ public class SimpleByteBufferCachePool implements ByteBufferCachePool {
                 top--;
                 return byteBuffer;
             } else {
-                logger.info("缓存池容量不足");
+                logger.info("cache pool out of stock");
                 return factory.create();
             }
         } finally {
@@ -107,10 +107,10 @@ public class SimpleByteBufferCachePool implements ByteBufferCachePool {
     }
 
     private void checkConfig(final CubeConfig cubeConfig) throws ByteBufferCachePoolInitException {
-        if (cubeConfig == null) throw new ByteBufferCachePoolInitException("配置不能为空");
+        if (cubeConfig == null) throw new ByteBufferCachePoolInitException("config can not be null");
 
         Integer poolSize = cubeConfig.getPoolSize();
-        if (poolSize == null) throw new ByteBufferCachePoolInitException("缓存池长度不能为空");
-        if (poolSize < 1) throw new ByteBufferCachePoolInitException("缓存池长度必须大于1");
+        if (poolSize == null) throw new ByteBufferCachePoolInitException("pool size can not be null");
+        if (poolSize < 1) throw new ByteBufferCachePoolInitException("pool size must greater than 1");
     }
 }

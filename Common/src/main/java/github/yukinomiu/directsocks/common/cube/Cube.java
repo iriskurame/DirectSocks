@@ -35,7 +35,7 @@ public class Cube implements LifeCycle {
         dispatcher.start();
 
         state = State.RUNNING;
-        logger.debug("Cube成功启动");
+        logger.debug("Cube started");
     }
 
     @Override
@@ -47,6 +47,6 @@ public class Cube implements LifeCycle {
         docker.shutdown();
 
         state = State.STOPPED;
-        logger.debug("Cube成功关闭");
+        logger.debug("Cube closed");
     }
 }

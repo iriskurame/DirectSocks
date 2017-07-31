@@ -11,6 +11,5 @@ import java.io.IOException;
 public class TargetRoleContext implements CloseableAttachment {
     @Override
     public void close() throws IOException {
-
     }
 }
