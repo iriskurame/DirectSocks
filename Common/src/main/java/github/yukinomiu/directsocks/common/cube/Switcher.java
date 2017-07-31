@@ -177,7 +177,7 @@ public class Switcher implements LifeCycle {
         try {
             n = socketChannel.read(readBuffer);
         } catch (IOException e) {
-            logger.error("read exception, connection will be closed", e);
+            logger.error("read exception: {}, connection will be closed", e.getMessage());
             cubeContext.cancel();
             return;
         }
@@ -215,7 +215,7 @@ public class Switcher implements LifeCycle {
         try {
             socketChannel.write(writeBuffer);
         } catch (IOException e) {
-            logger.error("write exception, connection will be closed", e);
+            logger.error("write exception: {}, connection will be closed", e.getMessage());
             cubeContext.cancel();
             return;
         }
@@ -272,7 +272,7 @@ public class Switcher implements LifeCycle {
             if (logger.isWarnEnabled()) {
                 String remoteAddressString = cubeContext.getRemoteAddress().getHostAddress();
                 String remoteIPString = String.valueOf(cubeContext.getRemotePort());
-                logger.warn("connect remote host {}:{} IO exception", remoteAddressString, remoteIPString);
+                logger.warn("connect remote host {}:{} IO exception: {}", remoteAddressString, remoteIPString, ioe.getMessage());
             }
 
             CubeConnectionException cubeConnectionException = new CubeConnectionException("connection exception: " + ioe.getMessage(), ioe);
