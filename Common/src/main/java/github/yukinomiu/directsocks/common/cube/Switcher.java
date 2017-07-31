@@ -177,7 +177,7 @@ public class Switcher implements LifeCycle {
         try {
             n = socketChannel.read(readBuffer);
         } catch (IOException e) {
-            logger.error("read exception: {}, connection will be closed", e.getMessage());
+            logger.warn("read exception: {}, connection will be closed", e.getMessage());
             cubeContext.cancel();
             return;
         }
@@ -215,7 +215,7 @@ public class Switcher implements LifeCycle {
         try {
             socketChannel.write(writeBuffer);
         } catch (IOException e) {
-            logger.error("write exception: {}, connection will be closed", e.getMessage());
+            logger.warn("write exception: {}, connection will be closed", e.getMessage());
             cubeContext.cancel();
             return;
         }
