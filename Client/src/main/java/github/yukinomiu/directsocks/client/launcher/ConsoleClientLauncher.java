@@ -77,11 +77,12 @@ public class ConsoleClientLauncher {
     private static ClientConfig loadClientConfig(String configFilePath) {
         // load client config file
         File file = new File(configFilePath);
+        String path = file.getAbsolutePath();
         if (!file.exists()) {
-            throw new DirectSocksConfigException("client config file not exists");
+            throw new DirectSocksConfigException("client config file '" + path + "' not exists");
         }
         if (file.isDirectory()) {
-            throw new DirectSocksConfigException("client config file can not be directory");
+            throw new DirectSocksConfigException("client config file '" + path + "' can not be directory");
         }
 
         Properties properties;
@@ -89,7 +90,7 @@ public class ConsoleClientLauncher {
             properties = new Properties();
             properties.load(ins);
         } catch (FileNotFoundException e) {
-            throw new DirectSocksConfigException("client config file not exists");
+            throw new DirectSocksConfigException("client config file '" + path + "' not exists");
         } catch (IOException e) {
             throw new DirectSocksConfigException("loading client config file IO exception", e);
         }

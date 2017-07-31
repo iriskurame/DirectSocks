@@ -119,11 +119,12 @@ public class ConsoleServerLauncher {
     private static ServerConfig loadServerConfig(String configFilePath) {
         // load server config file
         File file = new File(configFilePath);
+        String path = file.getAbsolutePath();
         if (!file.exists()) {
-            throw new DirectSocksConfigException("server config file not exists");
+            throw new DirectSocksConfigException("server config file '" + path + "' not exists");
         }
         if (file.isDirectory()) {
-            throw new DirectSocksConfigException("server config file can not be directory");
+            throw new DirectSocksConfigException("server config file '" + path + "' can not be directory");
         }
 
         Properties properties;
@@ -131,7 +132,7 @@ public class ConsoleServerLauncher {
             properties = new Properties();
             properties.load(ins);
         } catch (FileNotFoundException e) {
-            throw new DirectSocksConfigException("server config file not exists");
+            throw new DirectSocksConfigException("server config file '" + path + "' not exists");
         } catch (IOException e) {
             throw new DirectSocksConfigException("loading server config file IO exception", e);
         }
