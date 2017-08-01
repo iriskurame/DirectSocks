@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
  * Yukinomiu
  * 2017/7/24
  */
-public class Client implements LifeCycle {
+public final class Client implements LifeCycle {
     private static final Logger logger = LoggerFactory.getLogger(Client.class);
 
     private LifeCycle.State state;

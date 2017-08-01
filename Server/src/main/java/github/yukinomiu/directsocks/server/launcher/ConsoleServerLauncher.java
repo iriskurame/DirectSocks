@@ -1,9 +1,11 @@
 package github.yukinomiu.directsocks.server.launcher;
 
-import github.yukinomiu.directsocks.common.auth.CachedMD5TokenConverter;
-import github.yukinomiu.directsocks.common.auth.DefaultTokenChecker;
-import github.yukinomiu.directsocks.common.auth.TokenChecker;
-import github.yukinomiu.directsocks.common.auth.TokenConverter;
+import github.yukinomiu.directsocks.common.auth.CachedMD5TokenGenerator;
+import github.yukinomiu.directsocks.common.auth.DefaultTokenVerifier;
+import github.yukinomiu.directsocks.common.auth.TokenGenerator;
+import github.yukinomiu.directsocks.common.auth.TokenVerifier;
+import github.yukinomiu.directsocks.common.crypto.Crypto;
+import github.yukinomiu.directsocks.common.crypto.EmptyCrypto;
 import github.yukinomiu.directsocks.common.exception.DirectSocksConfigException;
 import github.yukinomiu.directsocks.common.util.PropertiesUtil;
 import github.yukinomiu.directsocks.server.core.Server;
@@ -21,19 +23,22 @@ import java.util.Properties;
  * Yukinomiu
  * 2017/7/30
  */
-public class ConsoleServerLauncher {
+public final class ConsoleServerLauncher {
     private static final Logger logger = LoggerFactory.getLogger(ConsoleServerLauncher.class);
 
     public static void main(String[] args) {
         // get server config file path
+        final String configFilePath;
         if (args == null || args.length == 0) {
-            logger.error("bad argument");
-            return;
+            logger.warn("use default config file");
+            configFilePath = "server.properties";
+        } else {
+            configFilePath = args[0];
         }
 
         // load config
         logger.info("start loading server config file");
-        final String configFilePath = args[0];
+
         final ServerConfig serverConfig;
         try {
             serverConfig = loadServerConfig(configFilePath);
@@ -61,8 +66,9 @@ public class ConsoleServerLauncher {
              BufferedReader bufferedReader = new BufferedReader(inputStreamReader)) {
 
             String line;
-            TokenChecker tokenChecker = serverConfig.getTokenChecker();
-            label:
+            TokenVerifier tokenVerifier = serverConfig.getTokenVerifier();
+
+            control:
             while ((line = bufferedReader.readLine()) != null) {
                 logger.info("process command '{}'", line);
 
@@ -72,13 +78,13 @@ public class ConsoleServerLauncher {
                 switch (command) {
                     case "q":
                         logger.info("server will quit");
-                        break label;
+                        break control;
 
                     case "add":
                         if (commands.length > 1) {
                             for (int i = 1; i < commands.length; i++) {
                                 String key = commands[i];
-                                tokenChecker.add(key);
+                                tokenVerifier.add(key);
                                 logger.info("add key '{}'", key);
                             }
                         }
@@ -88,7 +94,7 @@ public class ConsoleServerLauncher {
                         if (commands.length > 1) {
                             for (int i = 1; i < commands.length; i++) {
                                 String key = commands[i];
-                                boolean isRemoved = tokenChecker.remove(key);
+                                boolean isRemoved = tokenVerifier.remove(key);
                                 if (isRemoved) {
                                     logger.info("key '{}' removed", key);
                                 } else {
@@ -99,7 +105,7 @@ public class ConsoleServerLauncher {
                         break;
 
                     case "list":
-                        for (String key : tokenChecker.listKeys()) {
+                        for (String key : tokenVerifier.listKeys()) {
                             logger.info("'{}'", key);
                         }
                         break;
@@ -138,18 +144,30 @@ public class ConsoleServerLauncher {
         }
 
         // get param
+        final TokenGenerator tokenGenerator;
+        final TokenVerifier tokenVerifier;
+        final String keys;
+        final String secret;
+        final Crypto crypto;
+
         final String bindAddressName;
         final int bindPort;
         final int backlog;
         final int workerCount;
         final boolean tcpNoDelay;
         final boolean tcpKeepAlive;
-        final int bufferSize;
-        final int poolSize;
+        final int readBufferSize;
+        final int readPoolSize;
+        final int writeBufferSize;
+        final int writePoolSize;
+        final int frameBufferSize;
+        final int framePoolSize;
 
-        final TokenConverter tokenConverter;
-        final TokenChecker tokenChecker;
-        final String keys;
+        tokenGenerator = new CachedMD5TokenGenerator();
+        tokenVerifier = new DefaultTokenVerifier(tokenGenerator);
+        keys = PropertiesUtil.getString(properties, "keys");
+        secret = PropertiesUtil.getString(properties, "secret");
+        crypto = new EmptyCrypto(secret);
 
         bindAddressName = PropertiesUtil.getString(properties, "bindAddressName");
         bindPort = PropertiesUtil.getInt(properties, "bindPort");
@@ -157,14 +175,17 @@ public class ConsoleServerLauncher {
         workerCount = PropertiesUtil.getInt(properties, "workerCount");
         tcpNoDelay = PropertiesUtil.getBoolean(properties, "tcpNoDelay");
         tcpKeepAlive = PropertiesUtil.getBoolean(properties, "tcpKeepAlive");
-        bufferSize = PropertiesUtil.getInt(properties, "bufferSize");
-        poolSize = PropertiesUtil.getInt(properties, "poolSize");
+        int bufferSize = PropertiesUtil.getInt(properties, "bufferSize");
+        int poolSize = PropertiesUtil.getInt(properties, "poolSize");
 
-        tokenConverter = new CachedMD5TokenConverter();
-        tokenChecker = new DefaultTokenChecker(tokenConverter);
-        keys = PropertiesUtil.getString(properties, "keys");
+        readBufferSize = bufferSize;
+        readPoolSize = poolSize;
+        writeBufferSize = bufferSize + crypto.getWriteBufferSizeDelta();
+        writePoolSize = poolSize;
+        frameBufferSize = bufferSize + crypto.getWriteBufferSizeDelta();
+        framePoolSize = poolSize;
 
-        // init ClientConfig
+        // init ServerConfig
         ServerConfig config = new ServerConfig();
         InetAddress bindAddress;
         try {
@@ -172,22 +193,30 @@ public class ConsoleServerLauncher {
         } catch (UnknownHostException e) {
             throw new DirectSocksConfigException("resolving host address exception", e);
         }
+
+        config.setTokenGenerator(tokenGenerator);
+        config.setTokenVerifier(tokenVerifier);
+        config.setSecret(secret);
+        config.setCrypto(crypto);
+
         config.setBindAddress(bindAddress);
         config.setBindPort(bindPort);
         config.setBacklog(backlog);
         config.setWorkerCount(workerCount);
         config.setTcpNoDelay(tcpNoDelay);
         config.setTcpKeepAlive(tcpKeepAlive);
-        config.setBufferSize(bufferSize);
-        config.setPoolSize(poolSize);
+        config.setReadBufferSize(readBufferSize);
+        config.setReadPoolSize(readPoolSize);
+        config.setWriteBufferSize(writeBufferSize);
+        config.setWritePoolSize(writePoolSize);
+        config.setFrameBufferSize(frameBufferSize);
+        config.setFramePoolSize(framePoolSize);
 
-        config.setTokenConverter(tokenConverter);
-        config.setTokenChecker(tokenChecker);
-
+        // add token
         String[] keysArray = keys.split(",");
         for (String key : keysArray) {
             key = key.trim();
-            tokenChecker.add(key);
+            tokenVerifier.add(key);
         }
         return config;
     }

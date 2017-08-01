@@ -4,7 +4,7 @@ package github.yukinomiu.directsocks.common.protocol;
  * Yukinomiu
  * 2017/7/29
  */
-public class DirectSocksReply {
+public final class DirectSocksReply {
     public static final byte SUCCESS = (byte) 0x00;
     public static final byte AUTH_FAIL = (byte) 0x01;
     public static final byte CONNECTION_TYPE_NOT_SUPPORTED = (byte) 0x02;

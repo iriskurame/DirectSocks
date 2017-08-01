@@ -4,8 +4,8 @@ package github.yukinomiu.directsocks.common.auth;
  * Yukinomiu
  * 2017/7/28
  */
-public interface TokenConverter {
+public interface TokenGenerator {
     int targetLength();
 
-    byte[] convertToken(final String key);
+    byte[] generate(final String key);
 }

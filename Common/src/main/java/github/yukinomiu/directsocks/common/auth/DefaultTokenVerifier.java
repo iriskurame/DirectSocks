@@ -10,24 +10,24 @@ import java.util.Set;
  * Yukinomiu
  * 2017/7/29
  */
-public class DefaultTokenChecker implements TokenChecker {
+public final class DefaultTokenVerifier implements TokenVerifier {
     private final Set<Integer> tokenSet = new HashSet<>();
     private final Set<String> keySet = new HashSet<>();
-    private final TokenConverter tokenConverter;
+    private final TokenGenerator tokenGenerator;
 
-    public DefaultTokenChecker(final TokenConverter tokenConverter) {
-        if (tokenConverter == null) throw new TokenCheckerRuntimeException("TokenConverter can not be null");
-        this.tokenConverter = tokenConverter;
+    public DefaultTokenVerifier(final TokenGenerator tokenGenerator) {
+        if (tokenGenerator == null) throw new TokenCheckerRuntimeException("TokenGenerator can not be null");
+        this.tokenGenerator = tokenGenerator;
     }
 
     @Override
-    public boolean check(final byte[] token) {
+    public boolean verify(final byte[] token) {
         int hashCode = Arrays.hashCode(token);
         return tokenSet.contains(hashCode);
     }
 
     @Override
-    public boolean check(final String key) {
+    public boolean verify(final String key) {
         return keySet.contains(key);
     }
 
@@ -36,7 +36,7 @@ public class DefaultTokenChecker implements TokenChecker {
         synchronized (tokenSet) {
             for (String key : keys) {
                 keySet.add(key);
-                byte[] token = tokenConverter.convertToken(key);
+                byte[] token = tokenGenerator.generate(key);
                 int hashCode = Arrays.hashCode(token);
                 tokenSet.add(hashCode);
             }
@@ -47,7 +47,7 @@ public class DefaultTokenChecker implements TokenChecker {
     public void add(final String key) {
         synchronized (tokenSet) {
             keySet.add(key);
-            byte[] token = tokenConverter.convertToken(key);
+            byte[] token = tokenGenerator.generate(key);
             int hashCode = Arrays.hashCode(token);
             tokenSet.add(hashCode);
         }
@@ -56,10 +56,13 @@ public class DefaultTokenChecker implements TokenChecker {
     @Override
     public boolean remove(final String key) {
         synchronized (tokenSet) {
-            keySet.remove(key);
-            byte[] token = tokenConverter.convertToken(key);
-            int hashCode = Arrays.hashCode(token);
-            return tokenSet.remove(hashCode);
+            boolean exists = keySet.remove(key);
+            if (exists) {
+                byte[] token = tokenGenerator.generate(key);
+                int hashCode = Arrays.hashCode(token);
+                tokenSet.remove(hashCode);
+            }
+            return exists;
         }
     }
 

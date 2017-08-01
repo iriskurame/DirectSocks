@@ -8,7 +8,7 @@ import java.util.Properties;
  * Yukinomiu
  * 2017/7/30
  */
-public class PropertiesUtil {
+public final class PropertiesUtil {
     private PropertiesUtil() {
     }
 

@@ -1,6 +1,7 @@
 package github.yukinomiu.directsocks.client.core;
 
-import github.yukinomiu.directsocks.common.auth.TokenConverter;
+import github.yukinomiu.directsocks.common.auth.TokenGenerator;
+import github.yukinomiu.directsocks.common.crypto.Crypto;
 import github.yukinomiu.directsocks.common.cube.CubeConfig;
 
 import java.net.InetAddress;
@@ -9,12 +10,14 @@ import java.net.InetAddress;
  * Yukinomiu
  * 2017/7/24
  */
-public class ClientConfig extends CubeConfig {
+public final class ClientConfig extends CubeConfig {
     private Boolean localDnsResolve;
     private InetAddress serverAddress;
     private Integer serverPort;
-    private TokenConverter tokenConverter;
+    private TokenGenerator tokenGenerator;
     private String key;
+    private String secret;
+    private Crypto crypto;
 
     public Boolean getLocalDnsResolve() {
         return localDnsResolve;
@@ -40,12 +43,12 @@ public class ClientConfig extends CubeConfig {
         this.serverPort = serverPort;
     }
 
-    public TokenConverter getTokenConverter() {
-        return tokenConverter;
+    public TokenGenerator getTokenGenerator() {
+        return tokenGenerator;
     }
 
-    public void setTokenConverter(TokenConverter tokenConverter) {
-        this.tokenConverter = tokenConverter;
+    public void setTokenGenerator(TokenGenerator tokenGenerator) {
+        this.tokenGenerator = tokenGenerator;
     }
 
     public String getKey() {
@@ -54,5 +57,21 @@ public class ClientConfig extends CubeConfig {
 
     public void setKey(String key) {
         this.key = key;
+    }
+
+    public String getSecret() {
+        return secret;
+    }
+
+    public void setSecret(String secret) {
+        this.secret = secret;
+    }
+
+    public Crypto getCrypto() {
+        return crypto;
+    }
+
+    public void setCrypto(Crypto crypto) {
+        this.crypto = crypto;
     }
 }

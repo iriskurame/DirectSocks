@@ -10,7 +10,7 @@ import github.yukinomiu.directsocks.common.cube.exception.CubeConnectionExceptio
 public interface NioHandle {
     void handleRead(final CubeContext cubeContext);
 
-    void handleConnectedSuccess(final CubeContext cubeContext);
+    void handleConnectSuccess(final CubeContext cubeContext);
 
-    void handleConnectedFail(final CubeContext cubeContext, final CubeConnectionException cubeConnectionException);
+    void handleConnectFail(final CubeContext cubeContext, final CubeConnectionException cubeConnectionException);
 }

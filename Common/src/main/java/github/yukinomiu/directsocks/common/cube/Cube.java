@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
  * Yukinomiu
  * 2017/7/19
  */
-public class Cube implements LifeCycle {
+public final class Cube implements LifeCycle {
     private static Logger logger = LoggerFactory.getLogger(Cube.class);
 
     private LifeCycle.State state;

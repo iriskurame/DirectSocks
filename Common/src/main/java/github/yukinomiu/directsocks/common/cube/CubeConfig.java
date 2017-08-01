@@ -20,8 +20,12 @@ public class CubeConfig {
     private Boolean tcpKeepAlive;
 
     // buffer config
-    private Integer bufferSize;
-    private Integer poolSize;
+    private Integer readBufferSize;
+    private Integer readPoolSize;
+    private Integer writeBufferSize;
+    private Integer writePoolSize;
+    private Integer frameBufferSize;
+    private Integer framePoolSize;
 
     public InetAddress getBindAddress() {
         return bindAddress;
@@ -71,19 +75,51 @@ public class CubeConfig {
         this.tcpKeepAlive = tcpKeepAlive;
     }
 
-    public Integer getBufferSize() {
-        return bufferSize;
+    public Integer getReadBufferSize() {
+        return readBufferSize;
     }
 
-    public void setBufferSize(Integer bufferSize) {
-        this.bufferSize = bufferSize;
+    public void setReadBufferSize(Integer readBufferSize) {
+        this.readBufferSize = readBufferSize;
     }
 
-    public Integer getPoolSize() {
-        return poolSize;
+    public Integer getReadPoolSize() {
+        return readPoolSize;
     }
 
-    public void setPoolSize(Integer poolSize) {
-        this.poolSize = poolSize;
+    public void setReadPoolSize(Integer readPoolSize) {
+        this.readPoolSize = readPoolSize;
+    }
+
+    public Integer getWriteBufferSize() {
+        return writeBufferSize;
+    }
+
+    public void setWriteBufferSize(Integer writeBufferSize) {
+        this.writeBufferSize = writeBufferSize;
+    }
+
+    public Integer getWritePoolSize() {
+        return writePoolSize;
+    }
+
+    public void setWritePoolSize(Integer writePoolSize) {
+        this.writePoolSize = writePoolSize;
+    }
+
+    public Integer getFrameBufferSize() {
+        return frameBufferSize;
+    }
+
+    public void setFrameBufferSize(Integer frameBufferSize) {
+        this.frameBufferSize = frameBufferSize;
+    }
+
+    public Integer getFramePoolSize() {
+        return framePoolSize;
+    }
+
+    public void setFramePoolSize(Integer framePoolSize) {
+        this.framePoolSize = framePoolSize;
     }
 }

@@ -17,7 +17,7 @@ import java.util.Set;
  * Yukinomiu
  * 2017/7/19
  */
-public class Dispatcher implements LifeCycle {
+public final class Dispatcher implements LifeCycle {
     private static Logger logger = LoggerFactory.getLogger(Dispatcher.class);
 
     private LifeCycle.State state;
@@ -43,8 +43,8 @@ public class Dispatcher implements LifeCycle {
             serverSocketChannel = ServerSocketChannel.open();
             serverSocketChannel.configureBlocking(false);
         } catch (IOException e) {
-            logger.error("init dispatcher IO exception", e);
-            throw new CubeInitException("Dispatcher IO exception", e);
+            logger.error("init dispatcher exception", e);
+            throw new CubeInitException("init dispatcher exception", e);
         }
 
         // bind server socket
@@ -133,21 +133,28 @@ public class Dispatcher implements LifeCycle {
                         SelectionKey selectionKey = iterator.next();
                         iterator.remove();
 
-                        if (!selectionKey.isValid()) {
-                            continue;
-                        }
-
-                        if (selectionKey.isAcceptable()) {
+                        if (selectionKey.isValid() && selectionKey.isAcceptable()) {
                             accept(selectionKey);
                         }
                     }
 
-                } catch (CancelledKeyException e) {
-                    logger.warn("connection is closed");
                 } catch (IOException e) {
                     logger.error("Dispatcher IO exception", e);
+
+                } catch (ClosedSelectorException e) {
+                    logger.error("DispatcherSelector is closed");
+                    break;
+
+                } catch (CancelledKeyException e) {
+                    logger.warn("connection is closed");
+
                 } catch (Exception e) {
-                    logger.debug("Dispatcher exception", e);
+                    logger.error("unknown dispatcher exception", e);
+                    try {
+                        dispatcherSelector.close();
+                    } catch (IOException ioe) {
+                        logger.error("closing dispatcher selector IO exception", e);
+                    }
                     break;
                 }
             }
@@ -183,8 +190,12 @@ public class Dispatcher implements LifeCycle {
         try {
             SocketChannel socketChannel = serverSocketChannel.accept();
             docker.accept(socketChannel);
-        } catch (Exception e) {
-            logger.error("dispatch request exception", e);
+        } catch (ClosedByInterruptException e) {
+            logger.debug("connection is closed by interrupting");
+        } catch (ClosedChannelException e) {
+            logger.warn("connection is closed");
+        } catch (IOException e) {
+            logger.error("dispatch request IO exception", e);
         }
     }
 }

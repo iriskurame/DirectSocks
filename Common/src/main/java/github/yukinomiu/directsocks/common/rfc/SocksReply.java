@@ -4,7 +4,7 @@ package github.yukinomiu.directsocks.common.rfc;
  * Yukinomiu
  * 2017/7/15
  */
-public class SocksReply {
+public final class SocksReply {
     public static final byte SUCCEEDED = (byte) 0x00;
     public static final byte GENERAL_SERVER_FAILURE = (byte) 0x01;
     public static final byte CONNECTION_NOT_ALLOWED = (byte) 0x02;

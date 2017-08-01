@@ -3,6 +3,7 @@ package github.yukinomiu.directsocks.common.cube;
 import github.yukinomiu.directsocks.common.cube.api.CloseableAttachment;
 import github.yukinomiu.directsocks.common.cube.cachepool.ByteBufferCachePool;
 import github.yukinomiu.directsocks.common.cube.exception.CubeConnectionException;
+import github.yukinomiu.directsocks.common.cube.exception.CubeRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,56 +18,47 @@ import java.nio.channels.SocketChannel;
  * Yukinomiu
  * 2017/7/20
  */
-public class CubeContext {
+public final class CubeContext {
     private static final Logger logger = LoggerFactory.getLogger(CubeContext.class);
 
     private final Switcher switcher;
     private final SelectionKey selectionKey;
-    private final ByteBufferCachePool byteBufferCachePool;
+    private final ByteBufferCachePool readPool;
+    private final ByteBufferCachePool writePool;
+    private final ByteBufferCachePool framePool;
 
     private ByteBuffer readBuffer;
     private ByteBuffer writeBuffer;
+    private ByteBuffer frameBuffer;
 
     private boolean readFlag = false;
     private boolean writeFlag = false;
-    private boolean cancelFlag = false;
+    private boolean closeFlag = false;
 
-    private boolean cancelAfterWriteFlag = false;
+    private boolean closeAfterWriteFlag = false;
     private boolean readAfterWriteFlag = false;
 
-    private boolean contextReadAfterWriteFlag = false;
-    private CubeContext context;
+    private boolean afterWriteCallbackFlag = false;
+    private AfterWriteCallback afterWriteCallback;
+    private Object arg;
 
     private CloseableAttachment attachment;
 
     CubeContext(final Switcher switcher,
                 final SelectionKey selectionKey,
-                final ByteBufferCachePool byteBufferCachePool) {
+                final ByteBufferCachePool readPool,
+                final ByteBufferCachePool writePool,
+                final ByteBufferCachePool framePool) {
 
         this.switcher = switcher;
         this.selectionKey = selectionKey;
-        this.byteBufferCachePool = byteBufferCachePool;
+        this.readPool = readPool;
+        this.writePool = writePool;
+        this.framePool = framePool;
 
-        readBuffer = byteBufferCachePool.get();
-        writeBuffer = byteBufferCachePool.get();
-    }
-
-    boolean getAndTurnOffCancelAfterWriteFlag() {
-        boolean old = cancelAfterWriteFlag;
-        cancelAfterWriteFlag = false;
-        return old;
-    }
-
-    boolean getAndTurnOffReadAfterWriteFlag() {
-        boolean old = readAfterWriteFlag;
-        readAfterWriteFlag = false;
-        return old;
-    }
-
-    boolean getAndTurnOffContextReadAfterWriteFlag() {
-        boolean old = contextReadAfterWriteFlag;
-        contextReadAfterWriteFlag = false;
-        return old;
+        readBuffer = readPool.get();
+        writeBuffer = writePool.get();
+        frameBuffer = framePool.get();
     }
 
     void finishRead() {
@@ -83,8 +75,32 @@ public class CubeContext {
         selectionKey.interestOps(selectionKey.interestOps() & (~SelectionKey.OP_CONNECT));
     }
 
-    void finishContextReadAfterWrite() {
-        context.readyRead();
+    boolean isCloseAfterWrite() {
+        return closeAfterWriteFlag;
+    }
+
+    void finishCloseAfterWrite() {
+        closeAfterWriteFlag = false;
+    }
+
+    boolean isReadAfterWrite() {
+        return readAfterWriteFlag;
+    }
+
+    void finishReadAfterWrite() {
+        readAfterWriteFlag = false;
+    }
+
+    boolean isAfterWriteCallback() {
+        return afterWriteCallbackFlag;
+    }
+
+    void finishAfterWriteCallback() {
+        afterWriteCallbackFlag = false;
+    }
+
+    void afterWriteCallback() {
+        afterWriteCallback.doCallback(arg);
     }
 
     public void readyRead() {
@@ -95,7 +111,7 @@ public class CubeContext {
         readFlag = true;
         selectionKey.interestOps(selectionKey.interestOps() | SelectionKey.OP_READ);
 
-        byteBufferCachePool.refresh(readBuffer);
+        readPool.refresh(readBuffer);
     }
 
     public ByteBuffer readyWrite() {
@@ -105,27 +121,46 @@ public class CubeContext {
 
         writeFlag = true;
         selectionKey.interestOps(selectionKey.interestOps() | SelectionKey.OP_WRITE);
-
-        byteBufferCachePool.refresh(writeBuffer);
+        writePool.refresh(writeBuffer);
         return writeBuffer;
     }
 
     public CubeContext readyConnect(final SocketAddress remoteAddress) throws CubeConnectionException {
-        if (remoteAddress == null) throw new NullPointerException("SocketAddress can not be null");
+        if (remoteAddress == null) throw new NullPointerException("remote SocketAddress can not be null");
+        CubeContext newCubeContext;
+        try {
+            newCubeContext = switcher.registerNew();
+        } catch (IOException e) {
+            logger.error("register new SocketChannel exception", e);
+            throw new CubeConnectionException("register new SocketChannel exception: " + e.getMessage(), e);
+        }
 
-        CubeContext newCubeContext = switcher.registerNewSocketChannel();
         SelectionKey newSelectionKey = newCubeContext.selectionKey;
-        SocketChannel newSocketChannel = (SocketChannel) newSelectionKey.channel();
-
         newSelectionKey.interestOps(newSelectionKey.interestOps() | SelectionKey.OP_CONNECT);
+        SocketChannel newSocketChannel = (SocketChannel) newSelectionKey.channel();
         try {
             newSocketChannel.connect(remoteAddress);
-        } catch (Exception e) {
-            newCubeContext.cancel();
-            throw new CubeConnectionException("connection exception", e);
+        } catch (IOException e) {
+            newCubeContext.close();
+            throw new CubeConnectionException("SocketChannel connection IO exception: " + e.getMessage(), e);
         }
 
         return newCubeContext;
+    }
+
+    public void closeAfterWrite() {
+        closeAfterWriteFlag = true;
+    }
+
+    public void readAfterWrite() {
+        readAfterWriteFlag = true;
+    }
+
+    public void setAfterWriteCallback(AfterWriteCallback afterWriteCallback, Object arg) {
+        if (afterWriteCallbackFlag) throw new CubeRuntimeException("after write callback has already been set");
+        afterWriteCallbackFlag = true;
+        this.afterWriteCallback = afterWriteCallback;
+        this.arg = arg;
     }
 
     public ByteBuffer getReadBuffer() {
@@ -136,14 +171,19 @@ public class CubeContext {
         return writeBuffer;
     }
 
-    public void cancel() {
-        if (cancelFlag) return;
+    public ByteBuffer getFrameBuffer() {
+        return frameBuffer;
+    }
 
-        cancelFlag = true;
+    public void close() {
+        if (closeFlag) return;
+        closeFlag = true;
+
         SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
 
         selectionKey.cancel();
         selectionKey.attach(null); // help GC
+
         try {
             socketChannel.close();
         } catch (IOException e) {
@@ -151,13 +191,18 @@ public class CubeContext {
         }
 
         if (readBuffer != null) {
-            byteBufferCachePool.returnBack(readBuffer);
+            readPool.returnBack(readBuffer);
             readBuffer = null;
         }
 
         if (writeBuffer != null) {
-            byteBufferCachePool.returnBack(writeBuffer);
+            writePool.returnBack(writeBuffer);
             writeBuffer = null;
+        }
+
+        if (frameBuffer != null) {
+            framePool.returnBack(frameBuffer);
+            frameBuffer = null;
         }
 
         if (attachment != null) {
@@ -169,19 +214,8 @@ public class CubeContext {
         }
     }
 
-    public void cancelAfterWrite() {
-        cancelAfterWriteFlag = true;
-    }
-
-    public void readAfterWrite() {
-        readAfterWriteFlag = true;
-    }
-
-    public void contextReadAfterWrite(final CubeContext cubeContext) {
-        if (cubeContext == null) throw new NullPointerException("CubeContext can not be null");
-
-        contextReadAfterWriteFlag = true;
-        context = cubeContext;
+    public boolean isClosed() {
+        return closeFlag;
     }
 
     public InetAddress getRemoteAddress() {

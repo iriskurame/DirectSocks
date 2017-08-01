@@ -2,13 +2,11 @@ package github.yukinomiu.directsocks.client.core;
 
 import github.yukinomiu.directsocks.common.cube.api.CloseableAttachment;
 
-import java.io.IOException;
-
 /**
  * Yukinomiu
  * 2017/7/28
  */
-public class LocalRoleContext implements CloseableAttachment {
+public final class LocalRoleContext implements CloseableAttachment {
     private LocalState localState;
 
     private Byte authMethod;
@@ -18,7 +16,7 @@ public class LocalRoleContext implements CloseableAttachment {
     private byte[] port;
 
     @Override
-    public void close() throws IOException {
+    public void close() {
     }
 
     public LocalState getLocalState() {

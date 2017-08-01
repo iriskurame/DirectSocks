@@ -6,18 +6,16 @@ import github.yukinomiu.directsocks.server.exception.ServerRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-
 /**
  * Yukinomiu
  * 2017/7/27
  */
-public class ServerContext implements CloseableAttachment {
+public final class ServerContext implements CloseableAttachment {
     private static final Logger logger = LoggerFactory.getLogger(ServerContext.class);
 
     private final ServerChannelRole serverChannelRole;
-
     private final CloseableAttachment currentChannelContext;
+
     private CubeContext associatedCubeContext;
 
     private boolean closeFlag = false;
@@ -35,19 +33,29 @@ public class ServerContext implements CloseableAttachment {
                 break;
 
             default:
-                throw new ServerRuntimeException("ServerChannelRole not supported: " + this.serverChannelRole);
+                logger.error("ServerChannelRole not supported: {}", this.serverChannelRole);
+                throw new ServerRuntimeException("ServerChannelRole not supported");
         }
     }
 
     @Override
-    public void close() throws IOException {
+    public void close() {
         if (closeFlag) return;
 
         closeFlag = true;
         try {
             currentChannelContext.close();
         } catch (Exception e) {
-            logger.error("关闭ServerContext异常", e);
+            logger.error("closing ServerContext exception", e);
+        }
+
+        if (associatedCubeContext != null && !associatedCubeContext.isClosed()) {
+            try {
+                associatedCubeContext.closeAfterWrite();
+                associatedCubeContext.readyWrite();
+            } catch (Exception e) {
+                logger.error("closing associated server CubeContext exception", e);
+            }
         }
     }
 

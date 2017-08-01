@@ -1,6 +1,5 @@
 package github.yukinomiu.directsocks.common.cube.cachepool;
 
-import github.yukinomiu.directsocks.common.cube.CubeConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,24 +10,26 @@ import java.util.concurrent.locks.ReentrantLock;
  * Yukinomiu
  * 2017/7/16
  */
-public class SimpleByteBufferCachePool implements ByteBufferCachePool {
+public final class SimpleByteBufferCachePool implements ByteBufferCachePool {
     private static final Logger logger = LoggerFactory.getLogger(SimpleByteBufferCachePool.class);
 
-    private final ByteBufferCachePoolFactory factory;
     private final ReentrantLock lock = new ReentrantLock();
+
+    private final ByteBufferCachePoolFactory factory;
     private final ByteBuffer[] stack;
     private final int maxIndex;
+
     private int top;
 
     private long getCount;
     private long returnCount;
 
-    public SimpleByteBufferCachePool(final CubeConfig cubeConfig) throws ByteBufferCachePoolInitException {
-        checkConfig(cubeConfig);
+    public SimpleByteBufferCachePool(final int bufferSize, final int poolSize) throws ByteBufferCachePoolInitException {
+        factory = new SimpleByteBufferCachePoolFactory(bufferSize);
 
-        factory = new SimpleByteBufferCachePoolFactory(cubeConfig);
+        if (poolSize < 1) throw new ByteBufferCachePoolInitException("pool size can not be less than 1");
 
-        stack = new ByteBuffer[cubeConfig.getPoolSize()];
+        stack = new ByteBuffer[poolSize];
         for (int i = 0; i < stack.length; i++) {
             stack[i] = factory.create();
         }
@@ -57,16 +58,16 @@ public class SimpleByteBufferCachePool implements ByteBufferCachePool {
     }
 
     @Override
-    public void returnBack(ByteBuffer object) {
-        if (object == null) return;
+    public void returnBack(final ByteBuffer byteBuffer) {
+        if (byteBuffer == null) return;
 
         lock.lock();
         returnCount++;
         try {
             int next = top + 1;
             if (next <= maxIndex) {
-                factory.refresh(object);
-                stack[next] = object;
+                factory.refresh(byteBuffer);
+                stack[next] = byteBuffer;
                 top = next;
             }
         } finally {
@@ -75,9 +76,9 @@ public class SimpleByteBufferCachePool implements ByteBufferCachePool {
     }
 
     @Override
-    public void refresh(ByteBuffer object) {
-        if (object == null) return;
-        factory.refresh(object);
+    public void refresh(final ByteBuffer byteBuffer) {
+        if (byteBuffer == null) return;
+        factory.refresh(byteBuffer);
     }
 
     @Override
@@ -89,7 +90,7 @@ public class SimpleByteBufferCachePool implements ByteBufferCachePool {
     public int left() {
         lock.lock();
         try {
-            return stack.length - top;
+            return top + 1;
         } finally {
             lock.unlock();
         }
@@ -104,13 +105,5 @@ public class SimpleByteBufferCachePool implements ByteBufferCachePool {
     public void shutdown() {
         factory.shutdown();
         logger.debug("{}: getCount={}, returnCount={}", this, getCount, returnCount);
-    }
-
-    private void checkConfig(final CubeConfig cubeConfig) throws ByteBufferCachePoolInitException {
-        if (cubeConfig == null) throw new ByteBufferCachePoolInitException("config can not be null");
-
-        Integer poolSize = cubeConfig.getPoolSize();
-        if (poolSize == null) throw new ByteBufferCachePoolInitException("pool size can not be null");
-        if (poolSize < 1) throw new ByteBufferCachePoolInitException("pool size must greater than 1");
     }
 }

@@ -12,8 +12,8 @@ import java.security.NoSuchAlgorithmException;
  * Yukinomiu
  * 2017/7/29
  */
-public class CachedMD5TokenConverter implements TokenConverter {
-    private static final Logger logger = LoggerFactory.getLogger(CachedMD5TokenConverter.class);
+public final class CachedMD5TokenGenerator implements TokenGenerator {
+    private static final Logger logger = LoggerFactory.getLogger(CachedMD5TokenGenerator.class);
     private static final ThreadLocal<Context> CONTEXT_THREAD_LOCAL = new ThreadLocal<>();
 
     @Override
@@ -28,22 +28,22 @@ public class CachedMD5TokenConverter implements TokenConverter {
     }
 
     @Override
-    public byte[] convertToken(String key) {
+    public byte[] generate(String key) {
         Context context = CONTEXT_THREAD_LOCAL.get();
         if (context == null) {
             context = new Context();
             CONTEXT_THREAD_LOCAL.set(context);
         }
 
-        return context.convertToken(key);
+        return context.generate(key);
     }
 
-    private static final class Context implements TokenConverter {
+    private static final class Context implements TokenGenerator {
         private final MessageDigest messageDigest;
         private final int targetLength;
 
         private String lastKey;
-        private byte[] lastDigest;
+        private byte[] lastToken;
 
         private Context() {
             try {
@@ -56,7 +56,7 @@ public class CachedMD5TokenConverter implements TokenConverter {
             targetLength = messageDigest.getDigestLength();
 
             lastKey = String.valueOf(System.currentTimeMillis());
-            lastDigest = messageDigest.digest(lastKey.getBytes(StandardCharsets.UTF_8));
+            lastToken = messageDigest.digest(lastKey.getBytes(StandardCharsets.UTF_8));
         }
 
         @Override
@@ -65,16 +65,16 @@ public class CachedMD5TokenConverter implements TokenConverter {
         }
 
         @Override
-        public byte[] convertToken(final String key) {
+        public byte[] generate(final String key) {
             if (lastKey.equals(key)) {
-                return lastDigest;
+                return lastToken;
             }
 
             messageDigest.reset();
 
             lastKey = key;
-            lastDigest = messageDigest.digest(lastKey.getBytes(StandardCharsets.UTF_8));
-            return lastDigest;
+            lastToken = messageDigest.digest(lastKey.getBytes(StandardCharsets.UTF_8));
+            return lastToken;
         }
     }
 }

@@ -1,7 +1,9 @@
 package github.yukinomiu.directsocks.server.core;
 
-import github.yukinomiu.directsocks.common.auth.TokenChecker;
-import github.yukinomiu.directsocks.common.auth.TokenConverter;
+import github.yukinomiu.directsocks.common.auth.TokenGenerator;
+import github.yukinomiu.directsocks.common.auth.TokenVerifier;
+import github.yukinomiu.directsocks.common.crypto.Crypto;
+import github.yukinomiu.directsocks.common.crypto.exception.CryptoException;
 import github.yukinomiu.directsocks.common.cube.CubeContext;
 import github.yukinomiu.directsocks.common.cube.api.NioHandle;
 import github.yukinomiu.directsocks.common.cube.exception.CubeConnectionException;
@@ -14,6 +16,7 @@ import github.yukinomiu.directsocks.server.exception.ServerRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.crypto.ShortBufferException;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -22,12 +25,12 @@ import java.nio.charset.StandardCharsets;
  * Yukinomiu
  * 2017/7/27
  */
-public class ServerNioHandle implements NioHandle {
+public final class ServerNioHandle implements NioHandle {
     private static final Logger logger = LoggerFactory.getLogger(ServerNioHandle.class);
 
     private final ServerConfig serverConfig;
 
-    public ServerNioHandle(final ServerConfig serverConfig) throws ServerInitException {
+    ServerNioHandle(final ServerConfig serverConfig) throws ServerInitException {
         checkConfig(serverConfig);
         this.serverConfig = serverConfig;
     }
@@ -37,10 +40,10 @@ public class ServerNioHandle implements NioHandle {
         ServerContext serverContext = (ServerContext) cubeContext.attachment();
         if (serverContext == null) {
             serverContext = new ServerContext(ServerChannelRole.CLIENT_ROLE);
+            cubeContext.attach(serverContext);
+
             ClientRoleContext clientRoleContext = (ClientRoleContext) serverContext.getCurrentChannelContext();
             clientRoleContext.setServerState(ServerState.DIRECT_SOCKS_AUTH);
-
-            cubeContext.attach(serverContext);
         }
 
         final ServerChannelRole currentRole = serverContext.getServerChannelRole();
@@ -54,8 +57,65 @@ public class ServerNioHandle implements NioHandle {
                 break;
 
             default:
-                throw new ServerRuntimeException("ServerChannelRole not supported: " + currentRole);
+                logger.error("ServerChannelRole not supported: {}", currentRole.name());
+                throw new ServerRuntimeException("ServerChannelRole not supported");
         }
+    }
+
+    @Override
+    public void handleConnectSuccess(CubeContext cubeContext) {
+        final ServerContext targetServerContext = (ServerContext) cubeContext.attachment();
+        final CubeContext clientCubeContext = targetServerContext.getAssociatedCubeContext();
+
+        final byte addressType;
+        final byte[] address;
+        final short portShort = (short) cubeContext.getLocalPort();
+
+        InetAddress localAddress = cubeContext.getLocalAddress();
+        if (localAddress instanceof Inet4Address) {
+            addressType = DirectSocksAddressType.IPV4;
+            address = localAddress.getAddress();
+        } else if (localAddress instanceof Inet6Address) {
+            addressType = DirectSocksAddressType.IPV6;
+            address = localAddress.getAddress();
+        } else {
+            logger.error("local address type not supported");
+            cubeContext.close();
+
+            final ByteBuffer writeBuffer = clientCubeContext.readyWrite();
+            writeBuffer.put(DirectSocksVersion.VERSION_1);
+            writeBuffer.put(DirectSocksReply.GENERAL_FAIL);
+            clientCubeContext.closeAfterWrite();
+            return;
+        }
+
+        // write
+        final ByteBuffer writeBuffer = clientCubeContext.readyWrite();
+        writeBuffer.put(DirectSocksVersion.VERSION_1);
+        writeBuffer.put(DirectSocksReply.SUCCESS);
+        writeBuffer.put(addressType);
+        writeBuffer.put(address);
+        writeBuffer.putShort(portShort);
+        clientCubeContext.readAfterWrite();
+
+        // change state
+        ServerContext clientServerContext = (ServerContext) clientCubeContext.attachment();
+        ClientRoleContext clientRoleContext = (ClientRoleContext) clientServerContext.getCurrentChannelContext();
+        clientRoleContext.setServerState(ServerState.DIRECT_SOCKS);
+    }
+
+    @Override
+    public void handleConnectFail(CubeContext cubeContext, CubeConnectionException cubeConnectionException) {
+        logger.warn("connect to target exception: {}", cubeConnectionException.getMessage());
+        cubeContext.close();
+
+        final ServerContext targetServerContext = (ServerContext) cubeContext.attachment();
+        CubeContext clientCubeContext = targetServerContext.getAssociatedCubeContext();
+
+        final ByteBuffer writeBuffer = clientCubeContext.readyWrite();
+        writeBuffer.put(DirectSocksVersion.VERSION_1);
+        writeBuffer.put(DirectSocksReply.HOST_UNREACHABLE);
+        clientCubeContext.closeAfterWrite();
     }
 
     private void handleClientRead(final CubeContext cubeContext, final ServerContext serverContext) {
@@ -71,20 +131,31 @@ public class ServerNioHandle implements NioHandle {
                 break;
 
             default:
-                throw new ServerRuntimeException("ServerState not supported: " + currentState);
+                logger.error("ServerState not supported: {}" + currentState.name());
+                throw new ServerRuntimeException("ServerState not supported");
 
         }
     }
 
     private void handleTargetRead(final CubeContext cubeContext, final ServerContext serverContext) {
-        CubeContext clientCubeContext = serverContext.getAssociatedCubeContext();
+        final CubeContext clientCubeContext = serverContext.getAssociatedCubeContext();
+        final Crypto crypto = serverConfig.getCrypto();
 
-        // exchange
         final ByteBuffer readBuffer = cubeContext.getReadBuffer();
-        ByteBuffer writeBuffer = clientCubeContext.readyWrite();
-        writeBuffer.put(readBuffer);
+        final ByteBuffer writeBuffer = clientCubeContext.readyWrite();
+
+        // encrypt and exchange
+        try {
+            crypto.encrypt(readBuffer, writeBuffer);
+        } catch (ShortBufferException | CryptoException e) {
+            logger.error("server encrypt exception", e);
+            cubeContext.close();
+            clientCubeContext.close();
+            return;
+        }
+
         clientCubeContext.readAfterWrite();
-        clientCubeContext.contextReadAfterWrite(cubeContext);
+        clientCubeContext.setAfterWriteCallback(arg -> cubeContext.readyRead(), null);
     }
 
     private void handleClientDirectSocksAuthRead(final CubeContext cubeContext,
@@ -93,17 +164,17 @@ public class ServerNioHandle implements NioHandle {
 
         // read
         final ByteBuffer readBuffer = cubeContext.getReadBuffer();
-        final int authLength = serverConfig.getTokenConverter().targetLength();
+        final int authLength = serverConfig.getTokenGenerator().targetLength();
 
         if (readBuffer.remaining() < authLength + 3) {
             logger.warn("DS error");
-            cubeContext.cancel();
+            cubeContext.close();
             return;
         }
 
         if (readBuffer.get() != DirectSocksVersion.VERSION_1) {
-            logger.warn("DS version {} not supported", readBuffer.get(0));
-            cubeContext.cancel();
+            logger.warn("DS version not supported, version: {}", readBuffer.get(0));
+            cubeContext.close();
             return;
         }
 
@@ -113,7 +184,7 @@ public class ServerNioHandle implements NioHandle {
         final byte connectionType = readBuffer.get();
         if (connectionType != DirectSocksConnectionType.TCP && connectionType != DirectSocksConnectionType.UDP) {
             logger.warn("DS error");
-            cubeContext.cancel();
+            cubeContext.close();
             return;
         }
 
@@ -124,7 +195,7 @@ public class ServerNioHandle implements NioHandle {
         if (addressType == DirectSocksAddressType.IPV4) {
             if (readBuffer.remaining() != 6) {
                 logger.warn("DS error");
-                cubeContext.cancel();
+                cubeContext.close();
                 return;
             }
 
@@ -135,7 +206,7 @@ public class ServerNioHandle implements NioHandle {
         } else if (addressType == DirectSocksAddressType.DOMAIN_NAME) {
             if (readBuffer.remaining() < 1) {
                 logger.warn("DS error");
-                cubeContext.cancel();
+                cubeContext.close();
                 return;
             }
 
@@ -143,7 +214,7 @@ public class ServerNioHandle implements NioHandle {
 
             if (readBuffer.remaining() != domainNameLength + 2) {
                 logger.warn("DS error");
-                cubeContext.cancel();
+                cubeContext.close();
                 return;
             }
 
@@ -154,7 +225,7 @@ public class ServerNioHandle implements NioHandle {
         } else if (addressType == DirectSocksAddressType.IPV6) {
             if (readBuffer.remaining() != 18) {
                 logger.warn("DS error");
-                cubeContext.cancel();
+                cubeContext.close();
                 return;
             }
 
@@ -164,7 +235,7 @@ public class ServerNioHandle implements NioHandle {
 
         } else {
             logger.warn("DS error");
-            cubeContext.cancel();
+            cubeContext.close();
             return;
         }
 
@@ -175,29 +246,29 @@ public class ServerNioHandle implements NioHandle {
         clientRoleContext.setAddress(address);
         clientRoleContext.setPort(portShort);
 
-        // check context
-        boolean authSuccess = serverConfig.getTokenChecker().check(token);
+        // verify context
+        boolean authSuccess = serverConfig.getTokenVerifier().verify(token);
         if (!authSuccess) {
             if (logger.isInfoEnabled()) {
                 String remoteAddressString = cubeContext.getRemoteAddress().getHostAddress();
                 String remotePortString = String.valueOf(cubeContext.getRemotePort());
-                logger.info("token auth fail, remote address {}:{}", remoteAddressString, remotePortString);
+                logger.info("token auth fail, remote address: {}:{}", remoteAddressString, remotePortString);
             }
 
             final ByteBuffer writeBuffer = cubeContext.readyWrite();
             writeBuffer.put(DirectSocksVersion.VERSION_1);
             writeBuffer.put(DirectSocksReply.AUTH_FAIL);
-            cubeContext.cancelAfterWrite();
+            cubeContext.closeAfterWrite();
             return;
         }
 
         if (connectionType != DirectSocksConnectionType.TCP) {
-            logger.info("connection type {} not supported", connectionType);
+            logger.info("connection type not supported, connection type: {}", connectionType);
 
             final ByteBuffer writeBuffer = cubeContext.readyWrite();
             writeBuffer.put(DirectSocksVersion.VERSION_1);
             writeBuffer.put(DirectSocksReply.CONNECTION_TYPE_NOT_SUPPORTED);
-            cubeContext.cancelAfterWrite();
+            cubeContext.closeAfterWrite();
             return;
         }
 
@@ -224,108 +295,71 @@ public class ServerNioHandle implements NioHandle {
             final ByteBuffer writeBuffer = cubeContext.readyWrite();
             writeBuffer.put(DirectSocksVersion.VERSION_1);
             writeBuffer.put(DirectSocksReply.HOST_UNREACHABLE);
-            cubeContext.cancelAfterWrite();
+            cubeContext.closeAfterWrite();
             return;
         }
 
+        // connect target
+        SocketAddress targetSocketAddress = new InetSocketAddress(targetAddress, (int) portShort);
+
+        CubeContext targetCubeContext;
         try {
-            SocketAddress targetSocketAddress = new InetSocketAddress(targetAddress, (int) portShort);
-
-            CubeContext targetCubeContext = cubeContext.readyConnect(targetSocketAddress);
-
-            ServerContext targetServerContext = new ServerContext(ServerChannelRole.TARGET_ROLE);
-            targetCubeContext.attach(targetServerContext);
-
-            // associate
-            serverContext.setAssociatedCubeContext(targetCubeContext);
-            targetServerContext.setAssociatedCubeContext(cubeContext);
+            targetCubeContext = cubeContext.readyConnect(targetSocketAddress);
         } catch (CubeConnectionException e) {
             logger.info("connect to target exception: {}", e.getMessage());
 
             final ByteBuffer writeBuffer = cubeContext.readyWrite();
             writeBuffer.put(DirectSocksVersion.VERSION_1);
             writeBuffer.put(DirectSocksReply.HOST_UNREACHABLE);
-            cubeContext.cancelAfterWrite();
+            cubeContext.closeAfterWrite();
+            return;
         }
+
+        ServerContext targetServerContext = new ServerContext(ServerChannelRole.TARGET_ROLE);
+        targetCubeContext.attach(targetServerContext);
+
+        // associate
+        serverContext.setAssociatedCubeContext(targetCubeContext);
+        targetServerContext.setAssociatedCubeContext(cubeContext);
     }
 
     private void handleClientDirectSocksRead(final CubeContext cubeContext,
                                              final ServerContext serverContext,
                                              final ClientRoleContext clientRoleContext) {
 
-        CubeContext targetCubeContext = serverContext.getAssociatedCubeContext();
+        final CubeContext targetCubeContext = serverContext.getAssociatedCubeContext();
+        final Crypto crypto = serverConfig.getCrypto();
 
-        // exchange
         final ByteBuffer readBuffer = cubeContext.getReadBuffer();
         final ByteBuffer writeBuffer = targetCubeContext.readyWrite();
-        writeBuffer.put(readBuffer);
-        targetCubeContext.readAfterWrite();
-        targetCubeContext.contextReadAfterWrite(cubeContext);
-    }
 
-    @Override
-    public void handleConnectedSuccess(CubeContext cubeContext) {
-        ServerContext targetServerContext = (ServerContext) cubeContext.attachment();
-        CubeContext clientCubeContext = targetServerContext.getAssociatedCubeContext();
-
-        final byte addressType;
-        final byte[] address;
-        final short portShort = (short) cubeContext.getLocalPort();
-
-        InetAddress localAddress = cubeContext.getLocalAddress();
-        if (localAddress instanceof Inet4Address) {
-            addressType = DirectSocksAddressType.IPV4;
-            address = localAddress.getAddress();
-        } else if (localAddress instanceof Inet6Address) {
-            addressType = DirectSocksAddressType.IPV6;
-            address = localAddress.getAddress();
-        } else {
-            logger.error("local bind address type not supported");
-            cubeContext.cancel();
-
-            final ByteBuffer writeBuffer = clientCubeContext.readyWrite();
-            writeBuffer.put(DirectSocksVersion.VERSION_1);
-            writeBuffer.put(DirectSocksReply.GENERAL_FAIL);
-            clientCubeContext.cancelAfterWrite();
+        // decrypt and exchange
+        try {
+            crypto.decrypt(readBuffer, writeBuffer);
+        } catch (ShortBufferException | CryptoException e) {
+            logger.error("server decrypt exception", e);
+            cubeContext.close();
+            targetCubeContext.close();
             return;
         }
 
-        // write
-        final ByteBuffer writeBuffer = clientCubeContext.readyWrite();
-        writeBuffer.put(DirectSocksVersion.VERSION_1);
-        writeBuffer.put(DirectSocksReply.SUCCESS);
-        writeBuffer.put(addressType);
-        writeBuffer.put(address);
-        writeBuffer.putShort(portShort);
-        clientCubeContext.readAfterWrite();
-
-        // change state
-        ServerContext clientServerContext = (ServerContext) clientCubeContext.attachment();
-        ClientRoleContext clientRoleContext = (ClientRoleContext) clientServerContext.getCurrentChannelContext();
-        clientRoleContext.setServerState(ServerState.DIRECT_SOCKS);
-    }
-
-    @Override
-    public void handleConnectedFail(CubeContext cubeContext, CubeConnectionException cubeConnectionException) {
-        logger.warn("connect to target exception: {}", cubeConnectionException.getMessage());
-        cubeContext.cancel();
-
-        ServerContext targetServerContext = (ServerContext) cubeContext.attachment();
-        CubeContext clientCubeContext = targetServerContext.getAssociatedCubeContext();
-
-        final ByteBuffer writeBuffer = clientCubeContext.readyWrite();
-        writeBuffer.put(DirectSocksVersion.VERSION_1);
-        writeBuffer.put(DirectSocksReply.HOST_UNREACHABLE);
-        clientCubeContext.cancelAfterWrite();
+        targetCubeContext.readAfterWrite();
+        targetCubeContext.setAfterWriteCallback(arg -> cubeContext.readyRead(), null);
     }
 
     private void checkConfig(final ServerConfig serverConfig) throws ServerInitException {
         if (serverConfig == null) throw new ServerInitException("config can not be null");
 
-        TokenConverter tokenConverter = serverConfig.getTokenConverter();
-        if (tokenConverter == null) throw new ServerInitException("TokenConverter can not be null");
+        TokenGenerator tokenGenerator = serverConfig.getTokenGenerator();
+        if (tokenGenerator == null) throw new ServerInitException("TokenGenerator can not be null");
 
-        TokenChecker tokenChecker = serverConfig.getTokenChecker();
-        if (tokenChecker == null) throw new ServerInitException("TokenChecker can not be null");
+        TokenVerifier tokenVerifier = serverConfig.getTokenVerifier();
+        if (tokenVerifier == null) throw new ServerInitException("TokenVerifier can not be null");
+
+        String secret = serverConfig.getSecret();
+        if (secret == null) throw new ServerInitException("Secret can not be null");
+
+        Crypto crypto = serverConfig.getCrypto();
+        if (crypto == null) throw new ServerInitException("Crypto can not be null");
     }
 }
