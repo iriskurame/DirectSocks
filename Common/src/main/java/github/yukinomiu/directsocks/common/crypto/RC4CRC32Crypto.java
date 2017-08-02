@@ -21,8 +21,8 @@ import java.util.zip.CRC32;
 public final class RC4CRC32Crypto implements Crypto {
     private static final Logger logger = LoggerFactory.getLogger(RC4CRC32Crypto.class);
 
+    private static final int MAX_PADDING = EmptyPackageCrypto.MAX_PADDING + 4;
     private static final String ALGORITHM_NAME = "RC4";
-    private static final int WRITE_BUFFER_SIZE_DELTA = 4;
     private static final ThreadLocal<Context> CONTEXT_THREAD_LOCAL = new ThreadLocal<>();
 
     private final String secret;
@@ -32,12 +32,12 @@ public final class RC4CRC32Crypto implements Crypto {
     }
 
     @Override
-    public int getWriteBufferSizeDelta() {
-        return WRITE_BUFFER_SIZE_DELTA;
+    public int getMaxPadding() {
+        return MAX_PADDING;
     }
 
     @Override
-    public void encrypt(final ByteBuffer src, final ByteBuffer dst) throws ShortBufferException, CryptoException {
+    public void encrypt(final ByteBuffer src, final ByteBuffer dst) throws CryptoException {
         Context context = CONTEXT_THREAD_LOCAL.get();
         if (context == null) {
             context = new Context(secret);
@@ -47,16 +47,16 @@ public final class RC4CRC32Crypto implements Crypto {
     }
 
     @Override
-    public void decrypt(final ByteBuffer src, final ByteBuffer dst) throws ShortBufferException, CryptoException {
+    public boolean decrypt(final ByteBuffer frame, final ByteBuffer src, final ByteBuffer dst) throws CryptoException {
         Context context = CONTEXT_THREAD_LOCAL.get();
         if (context == null) {
             context = new Context(secret);
             CONTEXT_THREAD_LOCAL.set(context);
         }
-        context.decrypt(src, dst);
+        return context.decrypt(frame, src, dst);
     }
 
-    private static class Context implements Crypto {
+    private final class Context extends EmptyPackageCrypto {
         private final String secret;
         private final CRC32 crc32;
         private final Cipher encryptCipher;
@@ -64,11 +64,11 @@ public final class RC4CRC32Crypto implements Crypto {
         private final SecretKeySpec key;
 
         @Override
-        public int getWriteBufferSizeDelta() {
-            return WRITE_BUFFER_SIZE_DELTA;
+        public int getMaxPadding() {
+            return RC4CRC32Crypto.MAX_PADDING;
         }
 
-        public Context(final String secret) {
+        private Context(final String secret) {
             this.secret = secret;
             crc32 = new CRC32();
 
@@ -91,46 +91,50 @@ public final class RC4CRC32Crypto implements Crypto {
         }
 
         @Override
-        public void encrypt(final ByteBuffer src, final ByteBuffer dst) throws ShortBufferException, CryptoException {
-            /*// write crc32
+        protected void encryptPackage(final ByteBuffer src, final ByteBuffer dst) throws CryptoException {
+            // get origin data crc32
+            src.mark();
             crc32.reset();
             crc32.update(src);
-            src.position(0);
-            int checksum = (int) crc32.getValue();
-            dst.putInt(checksum);*/
+            final int checksum = (int) crc32.getValue();
+            src.reset();
 
-            // rc4 encrypt
+            // write crc32
+            dst.putInt(checksum);
+
+            // write encrypt data
             try {
                 encryptCipher.doFinal(src, dst);
-            } catch (IllegalBlockSizeException | BadPaddingException e) {
-                throw new CryptoException("encrypt exception", e);
+            } catch (ShortBufferException | IllegalBlockSizeException | BadPaddingException e) {
+                throw new CryptoException("encrypt exception: " + e.getMessage(), e);
             }
-            dst.put(src);
         }
 
         @Override
-        public void decrypt(final ByteBuffer src, final ByteBuffer dst) throws ShortBufferException, CryptoException {
-            // int checksum = src.getInt();
+        protected void decryptPackage(final ByteBuffer src, final ByteBuffer dst) throws CryptoException {
+            // get origin data crc32
+            final int checksum = src.getInt();
+
+            // decrypt data
+            final int backupPosition = dst.position();
             try {
                 decryptCipher.doFinal(src, dst);
-            } catch (IllegalBlockSizeException | BadPaddingException e) {
-                throw new CryptoException("decrypt exception", e);
+            } catch (ShortBufferException | IllegalBlockSizeException | BadPaddingException e) {
+                throw new CryptoException("encrypt exception: " + e.getMessage(), e);
             }
 
-            /*// verify checksum
+            // verify
             dst.flip();
+            dst.position(backupPosition);
             crc32.reset();
             crc32.update(dst);
-            int actualChecksum = (int) crc32.getValue();
-            dst.limit(dst.capacity());
+            final int actualChecksum = (int) crc32.getValue();
 
-            if (checksum != actualChecksum) {
-                logger.warn("CRC32 checksum fail");
+            if (actualChecksum != checksum) {
+                logger.warn("checksum verify fail");
+                dst.position(backupPosition);
             }
-            else {
-                System.out.println("crc32 success");
-            }
-            dst.put(src);*/
+            dst.limit(dst.capacity());
         }
     }
 }

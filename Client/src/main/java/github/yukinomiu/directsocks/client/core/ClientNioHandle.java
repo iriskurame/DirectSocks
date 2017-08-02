@@ -16,7 +16,6 @@ import github.yukinomiu.directsocks.common.rfc.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.crypto.ShortBufferException;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -420,7 +419,7 @@ public final class ClientNioHandle implements NioHandle {
         // encrypt and exchange
         try {
             crypto.encrypt(readBuffer, writeBuffer);
-        } catch (ShortBufferException | CryptoException e) {
+        } catch (CryptoException e) {
             logger.error("client encrypt exception", e);
             cubeContext.close();
             serverCubeContext.close();
@@ -440,19 +439,26 @@ public final class ClientNioHandle implements NioHandle {
 
         final ByteBuffer readBuffer = cubeContext.getReadBuffer();
         final ByteBuffer writeBuffer = localCubeContext.readyWrite();
+        final ByteBuffer frameBuffer = cubeContext.getFrameBuffer();
 
         // decrypt and exchange
+        boolean process;
         try {
-            crypto.decrypt(readBuffer, writeBuffer);
-        } catch (ShortBufferException | CryptoException e) {
+            process = crypto.decrypt(frameBuffer, readBuffer, writeBuffer);
+        } catch (CryptoException e) {
             logger.error("client decrypt exception", e);
             cubeContext.close();
             localCubeContext.close();
             return;
         }
 
-        localCubeContext.readAfterWrite();
-        localCubeContext.setAfterWriteCallback(arg -> cubeContext.readyRead(), null);
+        if (process) {
+            localCubeContext.readAfterWrite();
+            localCubeContext.setAfterWriteCallback(arg -> cubeContext.readyRead(), null);
+        } else {
+            localCubeContext.cancelReadyWrite();
+            cubeContext.readyRead();
+        }
     }
 
     private void handleServerDirectSocksAuthRead(final CubeContext cubeContext,

@@ -1,8 +1,5 @@
 package github.yukinomiu.directsocks.common.crypto;
 
-import github.yukinomiu.directsocks.common.crypto.exception.CryptoException;
-
-import javax.crypto.ShortBufferException;
 import java.nio.ByteBuffer;
 
 /**
@@ -10,21 +7,19 @@ import java.nio.ByteBuffer;
  * 2017/7/31
  */
 public final class EmptyCrypto implements Crypto {
-    public EmptyCrypto(final String secret) {
-    }
-
     @Override
-    public int getWriteBufferSizeDelta() {
+    public int getMaxPadding() {
         return 0;
     }
 
     @Override
-    public void encrypt(ByteBuffer src, ByteBuffer dst) throws ShortBufferException, CryptoException {
+    public void encrypt(final ByteBuffer src, final ByteBuffer dst) {
         dst.put(src);
     }
 
     @Override
-    public void decrypt(ByteBuffer src, ByteBuffer dst) throws ShortBufferException, CryptoException {
+    public boolean decrypt(final ByteBuffer frame, final ByteBuffer src, final ByteBuffer dst) {
         dst.put(src);
+        return true;
     }
 }

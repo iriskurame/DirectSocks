@@ -5,7 +5,7 @@ import github.yukinomiu.directsocks.common.auth.DefaultTokenVerifier;
 import github.yukinomiu.directsocks.common.auth.TokenGenerator;
 import github.yukinomiu.directsocks.common.auth.TokenVerifier;
 import github.yukinomiu.directsocks.common.crypto.Crypto;
-import github.yukinomiu.directsocks.common.crypto.EmptyCrypto;
+import github.yukinomiu.directsocks.common.crypto.RC4CRC32Crypto;
 import github.yukinomiu.directsocks.common.exception.DirectSocksConfigException;
 import github.yukinomiu.directsocks.common.util.PropertiesUtil;
 import github.yukinomiu.directsocks.server.core.Server;
@@ -167,7 +167,7 @@ public final class ConsoleServerLauncher {
         tokenVerifier = new DefaultTokenVerifier(tokenGenerator);
         keys = PropertiesUtil.getString(properties, "keys");
         secret = PropertiesUtil.getString(properties, "secret");
-        crypto = new EmptyCrypto(secret);
+        crypto = new RC4CRC32Crypto(secret);
 
         bindAddressName = PropertiesUtil.getString(properties, "bindAddressName");
         bindPort = PropertiesUtil.getInt(properties, "bindPort");
@@ -180,9 +180,9 @@ public final class ConsoleServerLauncher {
 
         readBufferSize = bufferSize;
         readPoolSize = poolSize;
-        writeBufferSize = bufferSize + crypto.getWriteBufferSizeDelta();
+        writeBufferSize = 2 * readBufferSize - 1;
         writePoolSize = poolSize;
-        frameBufferSize = bufferSize + crypto.getWriteBufferSizeDelta();
+        frameBufferSize = bufferSize + crypto.getMaxPadding();
         framePoolSize = poolSize;
 
         // init ServerConfig

@@ -6,7 +6,7 @@ import github.yukinomiu.directsocks.client.exception.ClientInitException;
 import github.yukinomiu.directsocks.common.auth.CachedMD5TokenGenerator;
 import github.yukinomiu.directsocks.common.auth.TokenGenerator;
 import github.yukinomiu.directsocks.common.crypto.Crypto;
-import github.yukinomiu.directsocks.common.crypto.EmptyCrypto;
+import github.yukinomiu.directsocks.common.crypto.RC4CRC32Crypto;
 import github.yukinomiu.directsocks.common.exception.DirectSocksConfigException;
 import github.yukinomiu.directsocks.common.util.PropertiesUtil;
 import org.slf4j.Logger;
@@ -138,7 +138,7 @@ public final class ConsoleClientLauncher {
         tokenGenerator = new CachedMD5TokenGenerator();
         key = PropertiesUtil.getString(properties, "key");
         secret = PropertiesUtil.getString(properties, "secret");
-        crypto = new EmptyCrypto(secret);
+        crypto = new RC4CRC32Crypto(secret);
 
         bindAddressName = PropertiesUtil.getString(properties, "bindAddressName");
         bindPort = PropertiesUtil.getInt(properties, "bindPort");
@@ -151,9 +151,9 @@ public final class ConsoleClientLauncher {
 
         readBufferSize = bufferSize;
         readPoolSize = poolSize;
-        writeBufferSize = bufferSize + crypto.getWriteBufferSizeDelta();
+        writeBufferSize = 2 * readBufferSize - 1;
         writePoolSize = poolSize;
-        frameBufferSize = bufferSize + crypto.getWriteBufferSizeDelta();
+        frameBufferSize = bufferSize + crypto.getMaxPadding();
         framePoolSize = poolSize;
 
         // init ClientConfig

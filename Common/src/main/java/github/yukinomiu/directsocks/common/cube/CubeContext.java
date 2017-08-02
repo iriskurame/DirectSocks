@@ -110,7 +110,6 @@ public final class CubeContext {
 
         readFlag = true;
         selectionKey.interestOps(selectionKey.interestOps() | SelectionKey.OP_READ);
-
         readPool.refresh(readBuffer);
     }
 
@@ -123,6 +122,10 @@ public final class CubeContext {
         selectionKey.interestOps(selectionKey.interestOps() | SelectionKey.OP_WRITE);
         writePool.refresh(writeBuffer);
         return writeBuffer;
+    }
+
+    public void cancelReadyWrite() {
+        finishWrite();
     }
 
     public CubeContext readyConnect(final SocketAddress remoteAddress) throws CubeConnectionException {
