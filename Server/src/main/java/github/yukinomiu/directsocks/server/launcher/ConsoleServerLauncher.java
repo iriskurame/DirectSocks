@@ -30,7 +30,7 @@ public final class ConsoleServerLauncher {
         // get server config file path
         final String configFilePath;
         if (args == null || args.length == 0) {
-            logger.warn("use default config file");
+            logger.warn("use default config file name 'server.properties'");
             configFilePath = "server.properties";
         } else {
             configFilePath = args[0];

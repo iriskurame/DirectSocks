@@ -28,7 +28,7 @@ public final class ConsoleClientLauncher {
         // get client config file path
         final String configFilePath;
         if (args == null || args.length == 0) {
-            logger.warn("use default config file");
+            logger.warn("use default config file name 'client.properties'");
             configFilePath = "client.properties";
         } else {
             configFilePath = args[0];
