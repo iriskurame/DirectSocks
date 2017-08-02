@@ -3,7 +3,6 @@ package github.yukinomiu.directsocks.server.core;
 import github.yukinomiu.directsocks.common.auth.TokenGenerator;
 import github.yukinomiu.directsocks.common.auth.TokenVerifier;
 import github.yukinomiu.directsocks.common.crypto.Crypto;
-import github.yukinomiu.directsocks.common.crypto.exception.CryptoException;
 import github.yukinomiu.directsocks.common.cube.CubeContext;
 import github.yukinomiu.directsocks.common.cube.api.NioHandle;
 import github.yukinomiu.directsocks.common.cube.exception.CubeConnectionException;
@@ -146,8 +145,8 @@ public final class ServerNioHandle implements NioHandle {
         // encrypt and exchange
         try {
             crypto.encrypt(readBuffer, writeBuffer);
-        } catch (CryptoException e) {
-            logger.error("server encrypt exception", e);
+        } catch (Exception e) {
+            logger.warn("server encrypt exception: {}", e.getMessage());
             cubeContext.close();
             clientCubeContext.close();
             return;
@@ -337,8 +336,8 @@ public final class ServerNioHandle implements NioHandle {
         boolean process;
         try {
             process = crypto.decrypt(frameBuffer, readBuffer, writeBuffer);
-        } catch (CryptoException e) {
-            logger.error("server decrypt exception", e);
+        } catch (Exception e) {
+            logger.warn("server decrypt exception: {}", e.getMessage());
             cubeContext.close();
             targetCubeContext.close();
             return;

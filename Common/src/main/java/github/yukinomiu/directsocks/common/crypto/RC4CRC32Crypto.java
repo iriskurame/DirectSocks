@@ -120,7 +120,7 @@ public final class RC4CRC32Crypto implements Crypto {
             try {
                 decryptCipher.doFinal(src, dst);
             } catch (ShortBufferException | IllegalBlockSizeException | BadPaddingException e) {
-                throw new CryptoException("encrypt exception: " + e.getMessage(), e);
+                throw new CryptoException("decrypt exception: " + e.getMessage(), e);
             }
 
             // verify
